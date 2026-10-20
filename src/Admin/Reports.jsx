@@ -52,7 +52,7 @@ const Reports = () => {
   const [bookingTrends, setBookingTrends] = useState([]);
   const [teaServiceData, setTeaServiceData] = useState({ total: 0, withTea: 0, withoutTea: 0 });
 
-  const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f'];
+  const COLORS = ['#1976d2', '#05346e', '#074cac', '#0b5ac7', '#0f60d1'];
 
   useEffect(() => {
     fetchData();
@@ -74,30 +74,50 @@ const Reports = () => {
         axiosInstance.get('/rooms'),
       ]);
 
-      setBookings(bookingsRes.data.data || []);
-      setRooms(roomsRes.data.data || []);
+      // ✅ Fix: Handle different response structures
+      const bookingsData = bookingsRes.data?.data || bookingsRes.data || [];
+      const roomsData = roomsRes.data?.data || roomsRes.data || [];
 
-      // Extract departments
-      const depts = [...new Set(roomsRes.data.data.map(r => r.department))];
+      console.log('📋 Bookings data:', bookingsData);
+      console.log('📋 Rooms data:', roomsData);
+
+      setBookings(bookingsData);
+      setRooms(roomsData);
+
+      // Extract departments from rooms
+      const depts = [...new Set(roomsData.map(r => r.department).filter(Boolean))];
       setDepartments(depts);
 
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('Failed to load report data');
+      setError(err.response?.data?.message || 'Failed to load report data');
     } finally {
       setLoading(false);
     }
   };
 
   const generateReports = () => {
+    // ✅ Get room lookup map for quick access
+    const roomMap = {};
+    rooms.forEach(room => {
+      roomMap[room._id] = room;
+    });
+
     // Filter bookings
     let filteredBookings = [...bookings];
 
+    // ✅ Filter by department (check if room belongs to department)
     if (filterDepartment) {
-      const roomIds = rooms.filter(r => r.department === filterDepartment).map(r => r._id);
-      filteredBookings = filteredBookings.filter(b => roomIds.includes(b.room));
+      const roomIdsInDepartment = rooms
+        .filter(r => r.department === filterDepartment)
+        .map(r => r._id);
+      filteredBookings = filteredBookings.filter(b => {
+        const bookingRoomId = b.room?._id || b.room;
+        return roomIdsInDepartment.includes(bookingRoomId);
+      });
     }
 
+    // Filter by date range
     if (filterDateRange.start) {
       filteredBookings = filteredBookings.filter(
         b => new Date(b.meetingDate) >= new Date(filterDateRange.start)
@@ -109,10 +129,12 @@ const Reports = () => {
       );
     }
 
+    console.log('📊 Filtered bookings count:', filteredBookings.length);
+
     // 1. Department Utilization
     const deptStats = {};
     rooms.forEach(room => {
-      const dept = room.department;
+      const dept = room.department || 'Unassigned';
       if (!deptStats[dept]) {
         deptStats[dept] = { total: 0, booked: 0, available: 0 };
       }
@@ -135,16 +157,18 @@ const Reports = () => {
     // 2. Most Frequently Used Rooms
     const roomCount = {};
     filteredBookings.forEach(b => {
-      const roomId = b.room;
-      if (!roomCount[roomId]) roomCount[roomId] = 0;
-      roomCount[roomId] += 1;
+      const roomId = b.room?._id || b.room;
+      if (roomId) {
+        if (!roomCount[roomId]) roomCount[roomId] = 0;
+        roomCount[roomId] += 1;
+      }
     });
 
     const roomFrequencyData = Object.keys(roomCount)
       .map(roomId => {
-        const room = rooms.find(r => r._id === roomId);
+        const room = roomMap[roomId];
         return {
-          roomName: room?.roomName || 'Unknown',
+          roomName: room?.roomName || 'Unknown Room',
           count: roomCount[roomId],
           department: room?.department || 'Unknown',
         };
@@ -157,9 +181,11 @@ const Reports = () => {
     const monthStats = {};
     filteredBookings.forEach(b => {
       const date = new Date(b.meetingDate);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!monthStats[key]) monthStats[key] = 0;
-      monthStats[key] += 1;
+      if (!isNaN(date.getTime())) {
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthStats[key]) monthStats[key] = 0;
+        monthStats[key] += 1;
+      }
     });
 
     const trendData = Object.keys(monthStats)
@@ -171,12 +197,19 @@ const Reports = () => {
     setBookingTrends(trendData);
 
     // 4. Tea Service Statistics
-    const withTea = filteredBookings.filter(b => b.teaService).length;
+    const withTea = filteredBookings.filter(b => b.teaService === true).length;
     const withoutTea = filteredBookings.length - withTea;
     setTeaServiceData({
       total: filteredBookings.length,
       withTea,
       withoutTea,
+    });
+
+    console.log('📊 Reports generated:', {
+      deptData: deptData.length,
+      roomFrequencyData: roomFrequencyData.length,
+      trendData: trendData.length,
+      teaService: { withTea, withoutTea }
     });
   };
 
@@ -201,69 +234,12 @@ const Reports = () => {
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-        {/* Filters */}
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Filters
-          </Typography>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth>
-                <InputLabel>Department</InputLabel>
-                <Select
-                  value={filterDepartment}
-                  onChange={(e) => setFilterDepartment(e.target.value)}
-                  label="Department"
-                >
-                  <MenuItem value="">All Departments</MenuItem>
-                  {departments.map(dept => (
-                    <MenuItem key={dept} value={dept}>{dept}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <TextField
-                fullWidth
-                type="date"
-                label="Start Date"
-                value={filterDateRange.start}
-                onChange={(e) => setFilterDateRange({ ...filterDateRange, start: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <TextField
-                fullWidth
-                type="date"
-                label="End Date"
-                value={filterDateRange.end}
-                onChange={(e) => setFilterDateRange({ ...filterDateRange, end: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => {
-                  setFilterDepartment('');
-                  setFilterDateRange({ start: '', end: '' });
-                }}
-              >
-                Clear Filters
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* Summary Stats */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
                 <Typography variant="h4" color="primary">
-                  {departmentUtilization.reduce((sum, d) => sum + d.total, 0)}
+                  {rooms.length}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">Total Rooms</Typography>
               </CardContent>
@@ -318,9 +294,9 @@ const Reports = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="total" fill="#1976d2" name="Total Rooms" />
-                  <Bar dataKey="booked" fill="#ed6c02" name="Booked Rooms" />
-                  <Bar dataKey="available" fill="#2e7d32" name="Available Rooms" />
+                  <Bar dataKey="total" fill="#084e94" name="Total Rooms" />
+                  <Bar dataKey="booked" fill="#0a3869" name="Booked Rooms" />
+                  <Bar dataKey="available" fill="#0f7ff0" name="Available Rooms" />
                 </BarChart>
               </ResponsiveContainer>
             </Paper>
@@ -338,7 +314,7 @@ const Reports = () => {
                   <XAxis type="number" />
                   <YAxis dataKey="roomName" type="category" width={100} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#9c27b0" name="Bookings" />
+                  <Bar dataKey="count" fill="#094ea3" name="Bookings" />
                 </BarChart>
               </ResponsiveContainer>
             </Paper>
@@ -383,8 +359,8 @@ const Reports = () => {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    <Cell fill="#2e7d32" />
-                    <Cell fill="#d32f2f" />
+                    <Cell fill="#0a4e97" />
+                    <Cell fill="#1083ee" />
                   </Pie>
                   <Tooltip />
                 </PieChart>

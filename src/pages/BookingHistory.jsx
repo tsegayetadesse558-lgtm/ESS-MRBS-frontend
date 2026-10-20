@@ -25,15 +25,23 @@ import {
 import {
   Cancel as CancelIcon,
   Refresh as RefreshIcon,
-  Close as CloseIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Pending as PendingIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axios';
+
+// "14:30" -> "2:30 PM"
+const formatTime12h = (time24) => {
+  if (!time24) return 'N/A';
+  const [h, m] = time24.split(':');
+  const hour = Number(h);
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${m} ${period}`;
+};
 
 const BookingHistory = () => {
   const { user } = useAuth();
@@ -53,11 +61,10 @@ const BookingHistory = () => {
       setLoading(true);
       setError('');
       const response = await axiosInstance.get('/bookings');
-      console.log('📊 Bookings fetched:', response.data);
-      
+
       if (response.data && response.data.success) {
         setBookings(response.data.data || []);
-      } else if (response.data && Array.isArray(response.data)) {
+      } else if (Array.isArray(response.data)) {
         setBookings(response.data);
       } else {
         setBookings([]);
@@ -127,121 +134,69 @@ const BookingHistory = () => {
     }
   };
 
-  const openCancelDialog = (bookingId) => {
-    setCancelDialog({ open: true, bookingId });
-  };
+  const openCancelDialog = (bookingId) => setCancelDialog({ open: true, bookingId });
+  const openDeleteDialog = (bookingId) => setDeleteDialog({ open: true, bookingId });
 
-  const openDeleteDialog = (bookingId) => {
-    setDeleteDialog({ open: true, bookingId });
-  };
-
+  // Is the meeting in the future (or today)?
   const isUpcoming = (booking) => {
+    if (!booking?.meetingDate) return false;
     const bookingDate = new Date(booking.meetingDate);
+    bookingDate.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return bookingDate >= today;
   };
 
-  // Check if cancel button should be disabled
+  // Cancel is allowed only for CONFIRMED + upcoming
   const isCancelDisabled = (booking) => {
     if (!booking) return true;
-    
     const status = booking.status?.toLowerCase();
-    
-    // Disable if status is any of these
-    if (status === 'cancelled' || status === 'canceled') return true;
-    if (status === 'rejected') return true;
-    if (status === 'approved') return true;
-    if (status === 'completed') return true;
-    
-    // Disable if booking is in the past
+    if (status !== 'confirmed') return true;
     if (!isUpcoming(booking)) return true;
-    
     return false;
   };
 
-  // Check if delete button should be disabled
+  // Delete is allowed for any booking that isn't already cancelled (admin-level cleanup)
   const isDeleteDisabled = (booking) => {
     if (!booking) return true;
-    
     const status = booking.status?.toLowerCase();
-    
-    // Disable if status is any of these (can't delete finalized bookings)
-    if (status === 'approved') return true;
-    if (status === 'rejected') return true;
-    if (status === 'cancelled' || status === 'canceled') return true;
-    if (status === 'completed') return true;
-    
-    return false;
+    return status === 'cancelled' || status === 'canceled';
   };
 
-  // Get tooltip text for cancel button
   const getCancelTooltip = (booking) => {
     if (!booking) return 'Booking not found';
-    
     const status = booking.status?.toLowerCase();
-    
-    if (status === 'cancelled' || status === 'canceled') {
-      return 'This booking has already been cancelled';
-    }
-    if (status === 'rejected') {
-      return 'This booking has been rejected by admin';
-    }
-    if (status === 'approved') {
-      return 'This booking has been approved by admin';
-    }
-    if (status === 'completed') {
-      return 'This booking has been completed';
-    }
-    if (!isUpcoming(booking)) {
-      return 'Cannot cancel past bookings';
-    }
+    if (status === 'cancelled' || status === 'canceled') return 'This booking has already been cancelled';
+    if (status === 'rejected') return 'This booking was rejected';
+    if (status !== 'confirmed') return 'Only confirmed bookings can be cancelled';
+    if (!isUpcoming(booking)) return 'Cannot cancel past bookings';
     return 'Cancel this booking';
   };
 
-  // Get tooltip text for delete button
   const getDeleteTooltip = (booking) => {
     if (!booking) return 'Booking not found';
-    
     const status = booking.status?.toLowerCase();
-    
-    if (status === 'approved') {
-      return 'Cannot delete approved booking';
-    }
-    if (status === 'rejected') {
-      return 'Cannot delete rejected booking';
-    }
-    if (status === 'cancelled' || status === 'canceled') {
-      return 'Cannot delete cancelled booking';
-    }
-    if (status === 'completed') {
-      return 'Cannot delete completed booking';
-    }
+    if (status === 'cancelled' || status === 'canceled') return 'This booking is already cancelled';
     return 'Delete this booking';
   };
 
   const getStatusColor = (status) => {
     if (!status) return 'default';
-    const statusLower = status.toLowerCase();
-    switch (statusLower) {
-      case 'pending': return 'warning';
-      case 'approved': return 'success';
+    switch (status.toLowerCase()) {
+      case 'confirmed': return 'success';
       case 'rejected': return 'error';
-      case 'cancelled': return 'error';
-      case 'canceled': return 'error';
-      case 'completed': return 'info';
+      case 'cancelled':
+      case 'canceled': return 'default';
       default: return 'default';
     }
   };
 
   const getStatusIcon = (status) => {
     if (!status) return null;
-    const statusLower = status.toLowerCase();
-    switch (statusLower) {
-      case 'pending': return <PendingIcon fontSize="small" />;
-      case 'approved': return <CheckCircleIcon fontSize="small" />;
+    switch (status.toLowerCase()) {
+      case 'confirmed': return <CheckCircleIcon fontSize="small" />;
       case 'rejected': return <ErrorIcon fontSize="small" />;
-      case 'cancelled': return <CancelIcon fontSize="small" />;
+      case 'cancelled':
       case 'canceled': return <CancelIcon fontSize="small" />;
       default: return null;
     }
@@ -266,11 +221,7 @@ const BookingHistory = () => {
           <Typography variant="h4" fontWeight="bold">
             My Bookings
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchBookings}
-          >
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchBookings}>
             Refresh
           </Button>
         </Box>
@@ -298,17 +249,17 @@ const BookingHistory = () => {
                   <TableCell sx={{ color: 'white', fontWeight: 600 }}>Room</TableCell>
                   <TableCell sx={{ color: 'white', fontWeight: 600 }}>Date</TableCell>
                   <TableCell sx={{ color: 'white', fontWeight: 600 }}>Time</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 600 }}>Guests</TableCell>
                   <TableCell sx={{ color: 'white', fontWeight: 600 }}>Tea Service</TableCell>
                   <TableCell sx={{ color: 'white', fontWeight: 600 }}>Status</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 600 }} align="center">Actions</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 600 }} align="center">
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {bookings.map((booking) => {
                   const cancelDisabled = isCancelDisabled(booking);
                   const deleteDisabled = isDeleteDisabled(booking);
-                  const status = booking.status?.toLowerCase();
 
                   return (
                     <TableRow key={booking._id} hover>
@@ -321,14 +272,15 @@ const BookingHistory = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        {booking.meetingDate ? new Date(booking.meetingDate).toLocaleDateString() : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {booking.startTime && booking.endTime 
-                          ? `${booking.startTime} - ${booking.endTime}` 
+                        {booking.meetingDate
+                          ? new Date(booking.meetingDate).toLocaleDateString()
                           : 'N/A'}
                       </TableCell>
-                      <TableCell>{booking.numberOfGuests || 0}</TableCell>
+                      <TableCell>
+                        {booking.startTime && booking.endTime
+                          ? `${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`
+                          : 'N/A'}
+                      </TableCell>
                       <TableCell>
                         <Chip
                           label={booking.teaService ? 'Yes' : 'No'}
@@ -340,7 +292,7 @@ const BookingHistory = () => {
                       <TableCell>
                         <Chip
                           icon={getStatusIcon(booking.status)}
-                          label={booking.status || 'Pending'}
+                          label={booking.status || 'confirmed'}
                           size="small"
                           color={getStatusColor(booking.status)}
                           variant="outlined"
@@ -348,7 +300,7 @@ const BookingHistory = () => {
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          {/* Cancel Button */}
+                          {/* Cancel */}
                           <Tooltip title={getCancelTooltip(booking)}>
                             <span>
                               <Button
@@ -363,9 +315,6 @@ const BookingHistory = () => {
                                   fontWeight: 500,
                                   borderRadius: 2,
                                   minWidth: 70,
-                                  '&:hover': {
-                                    backgroundColor: cancelDisabled ? 'transparent' : undefined,
-                                  }
                                 }}
                               >
                                 Cancel
@@ -373,7 +322,7 @@ const BookingHistory = () => {
                             </span>
                           </Tooltip>
 
-                          {/* Delete Button */}
+                          {/* Delete */}
                           <Tooltip title={getDeleteTooltip(booking)}>
                             <span>
                               <IconButton
@@ -381,12 +330,7 @@ const BookingHistory = () => {
                                 color="error"
                                 onClick={() => openDeleteDialog(booking._id)}
                                 disabled={deleteDisabled}
-                                sx={{
-                                  opacity: deleteDisabled ? 0.5 : 1,
-                                  '&:hover': {
-                                    backgroundColor: deleteDisabled ? 'transparent' : undefined,
-                                  }
-                                }}
+                                sx={{ opacity: deleteDisabled ? 0.5 : 1 }}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
@@ -403,8 +347,8 @@ const BookingHistory = () => {
         )}
 
         {/* Cancel Confirmation Dialog */}
-        <Dialog 
-          open={cancelDialog.open} 
+        <Dialog
+          open={cancelDialog.open}
           onClose={() => setCancelDialog({ open: false, bookingId: null })}
           maxWidth="sm"
           fullWidth
@@ -415,7 +359,7 @@ const BookingHistory = () => {
           </DialogTitle>
           <DialogContent>
             <Typography>
-              Are you sure you want to cancel this booking? 
+              Are you sure you want to cancel this booking?
               <br />
               <Typography component="span" color="error" variant="body2">
                 This action cannot be undone.
@@ -423,24 +367,18 @@ const BookingHistory = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button 
-              onClick={() => setCancelDialog({ open: false, bookingId: null })}
-            >
+            <Button onClick={() => setCancelDialog({ open: false, bookingId: null })}>
               No, Keep
             </Button>
-            <Button 
-              onClick={handleCancelBooking} 
-              color="error" 
-              variant="contained"
-            >
+            <Button onClick={handleCancelBooking} color="error" variant="contained">
               Yes, Cancel
             </Button>
           </DialogActions>
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <Dialog 
-          open={deleteDialog.open} 
+        <Dialog
+          open={deleteDialog.open}
           onClose={() => setDeleteDialog({ open: false, bookingId: null })}
           maxWidth="sm"
           fullWidth
@@ -459,22 +397,15 @@ const BookingHistory = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button 
-              onClick={() => setDeleteDialog({ open: false, bookingId: null })}
-            >
+            <Button onClick={() => setDeleteDialog({ open: false, bookingId: null })}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleDeleteBooking} 
-              color="error" 
-              variant="contained"
-            >
+            <Button onClick={handleDeleteBooking} color="error" variant="contained">
               Yes, Delete
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={6000}

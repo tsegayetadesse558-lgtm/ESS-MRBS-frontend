@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -24,6 +24,7 @@ import {
   Snackbar,
   Grid,
   Tooltip,
+  InputAdornment,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -33,6 +34,7 @@ import {
   Close as CloseIcon,
   AdminPanelSettings as AdminIcon,
   Person as PersonIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +49,7 @@ const ManageUsers = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null, userName: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -73,8 +76,7 @@ const ManageUsers = () => {
       setLoading(true);
       setError('');
       const response = await axiosInstance.get('/users');
-      console.log('📊 Users fetched:', response.data);
-      
+
       if (response.data && response.data.success) {
         setUsers(response.data.data || []);
       } else if (response.data && Array.isArray(response.data)) {
@@ -90,6 +92,15 @@ const ManageUsers = () => {
       setLoading(false);
     }
   };
+
+  // ---------- Filtered users (search by username) ----------
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) =>
+      (u.username || '').toLowerCase().includes(q)
+    );
+  }, [users, searchQuery]);
 
   const handleOpenDialog = (userData = null) => {
     if (userData) {
@@ -140,50 +151,40 @@ const ManageUsers = () => {
     setError('');
 
     try {
-      // Validate required fields
       if (!formData.fullName || !formData.username || !formData.department) {
         setError('Please fill in all required fields');
         return;
       }
 
-      // Validate password for new users
       if (!editingUser && (!formData.password || formData.password.length < 6)) {
         setError('Password must be at least 6 characters');
         return;
       }
 
-      // FIXED: Handle empty email - send null instead of empty string
       const submitData = {
         ...formData,
-        email: formData.email && formData.email.trim() !== '' ? formData.email.trim() : null,
+        email:
+          formData.email && formData.email.trim() !== ''
+            ? formData.email.trim()
+            : null,
       };
 
       if (editingUser) {
-        // Update user
         const updateData = { ...submitData };
         if (!updateData.password) delete updateData.password;
-        
+
         const response = await axiosInstance.put(`/users/${editingUser._id}`, updateData);
         if (response.data && response.data.success) {
-          setSnackbar({ 
-            open: true, 
-            message: '✅ User updated successfully', 
-            severity: 'success' 
-          });
+          setSnackbar({ open: true, message: '✅ User updated successfully', severity: 'success' });
           await fetchUsers();
           handleCloseDialog();
         } else {
           throw new Error(response.data?.message || 'Failed to update user');
         }
       } else {
-        // Create user
         const response = await axiosInstance.post('/users', submitData);
         if (response.data && response.data.success) {
-          setSnackbar({ 
-            open: true, 
-            message: '✅ User created successfully', 
-            severity: 'success' 
-          });
+          setSnackbar({ open: true, message: '✅ User created successfully', severity: 'success' });
           await fetchUsers();
           handleCloseDialog();
         } else {
@@ -192,10 +193,8 @@ const ManageUsers = () => {
       }
     } catch (err) {
       console.error('Error saving user:', err);
-      // FIXED: Better error message handling
       const errorMessage = err.response?.data?.message || err.message || 'Operation failed';
-      
-      // Check for duplicate key error
+
       if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
         setError('A user with this username or email already exists');
       } else {
@@ -208,11 +207,7 @@ const ManageUsers = () => {
     try {
       const response = await axiosInstance.delete(`/users/${deleteDialog.userId}`);
       if (response.data && response.data.success) {
-        setSnackbar({ 
-          open: true, 
-          message: '🗑️ User deleted successfully', 
-          severity: 'success' 
-        });
+        setSnackbar({ open: true, message: '🗑️ User deleted successfully', severity: 'success' });
         await fetchUsers();
       } else {
         throw new Error(response.data?.message || 'Failed to delete user');
@@ -229,43 +224,30 @@ const ManageUsers = () => {
     }
   };
 
-  const isCurrentUser = (userId) => {
-    return userId === user?.id || userId === user?._id;
-  };
+  const isCurrentUser = (userId) => userId === user?.id || userId === user?._id;
 
-  const canEditUser = (userToCheck) => {
-    return true;
-  };
+  const canEditUser = () => true;
 
   const canDeleteUser = (userToCheck) => {
     if (!userToCheck) return false;
-    
-    if (isCurrentUser(userToCheck._id)) {
-      return false;
-    }
-    
-    const adminCount = users.filter(u => u.role === 'admin').length;
-    if (userToCheck.role === 'admin' && adminCount <= 1) {
-      return false;
-    }
-    
+    if (isCurrentUser(userToCheck._id)) return false;
+
+    const adminCount = users.filter((u) => u.role === 'admin').length;
+    if (userToCheck.role === 'admin' && adminCount <= 1) return false;
+
     return true;
   };
 
   const getDeleteTooltip = (userToCheck) => {
-    if (isCurrentUser(userToCheck._id)) {
-      return 'Cannot delete your own account';
-    }
-    const adminCount = users.filter(u => u.role === 'admin').length;
+    if (isCurrentUser(userToCheck._id)) return 'Cannot delete your own account';
+    const adminCount = users.filter((u) => u.role === 'admin').length;
     if (userToCheck.role === 'admin' && adminCount <= 1) {
       return 'Cannot delete the last admin user';
     }
     return 'Delete this user';
   };
 
-  const getEditTooltip = (userToCheck) => {
-    return 'Edit this user';
-  };
+  const getEditTooltip = () => 'Edit this user';
 
   if (loading) {
     return (
@@ -282,11 +264,58 @@ const ManageUsers = () => {
     <>
       <Navbar />
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h4" fontWeight="bold">
-            Manage Users
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+        {/* Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', md: 'center' },
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 2,
+            mb: 4,
+          }}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              Manage Users
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Create, edit, and manage system users.
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              width: { xs: '100%', md: 'auto' },
+            }}
+          >
+            {/* ---------- Search bar ---------- */}
+            <TextField
+              size="small"
+              placeholder="Search users by username..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              sx={{ minWidth: { xs: '100%', sm: 260 } }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -311,6 +340,18 @@ const ManageUsers = () => {
           </Alert>
         )}
 
+        {/* Result count (only when searching) */}
+        {searchQuery && (
+          <Box sx={{ mb: 2 }}>
+            <Chip
+              label={`Found ${filteredUsers.length} of ${users.length} user${users.length === 1 ? '' : 's'}`}
+              color="primary"
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+        )}
+
         <TableContainer component={Paper} elevation={3}>
           <Table>
             <TableHead sx={{ bgcolor: 'primary.main' }}>
@@ -320,27 +361,31 @@ const ManageUsers = () => {
                 <TableCell sx={{ color: 'white', fontWeight: 600 }}>Email</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 600 }}>Department</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 600 }}>Role</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 600 }} align="center">Actions</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 600 }} align="center">
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {!users || users.length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
                     <Typography variant="body1" color="text.secondary" sx={{ py: 4 }}>
-                      No users found
+                      {users.length === 0
+                        ? 'No users found'
+                        : `No users match "${searchQuery}".`}
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                users.map((u) => {
+                filteredUsers.map((u) => {
                   const isCurrent = isCurrentUser(u._id);
                   const canEdit = canEditUser(u);
                   const canDelete = canDeleteUser(u);
 
                   return (
-                    <TableRow 
-                      key={u._id} 
+                    <TableRow
+                      key={u._id}
                       hover
                       sx={{
                         backgroundColor: isCurrent ? 'rgba(25, 118, 210, 0.04)' : 'inherit',
@@ -350,10 +395,10 @@ const ManageUsers = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {u.fullName}
                           {isCurrent && (
-                            <Chip 
-                              label="You" 
-                              size="small" 
-                              color="primary" 
+                            <Chip
+                              label="You"
+                              size="small"
+                              color="primary"
                               variant="outlined"
                               sx={{ fontSize: '0.6rem', height: 20 }}
                             />
@@ -365,7 +410,13 @@ const ManageUsers = () => {
                       <TableCell>{u.department}</TableCell>
                       <TableCell>
                         <Chip
-                          icon={u.role === 'admin' ? <AdminIcon fontSize="small" /> : <PersonIcon fontSize="small" />}
+                          icon={
+                            u.role === 'admin' ? (
+                              <AdminIcon fontSize="small" />
+                            ) : (
+                              <PersonIcon fontSize="small" />
+                            )
+                          }
                           label={u.role}
                           size="small"
                           color={u.role === 'admin' ? 'primary' : 'default'}
@@ -392,7 +443,13 @@ const ManageUsers = () => {
                               <IconButton
                                 size="small"
                                 color="error"
-                                onClick={() => setDeleteDialog({ open: true, userId: u._id, userName: u.fullName })}
+                                onClick={() =>
+                                  setDeleteDialog({
+                                    open: true,
+                                    userId: u._id,
+                                    userName: u.fullName,
+                                  })
+                                }
                                 disabled={!canDelete}
                               >
                                 <DeleteIcon />
@@ -471,7 +528,9 @@ const ManageUsers = () => {
                     required
                   >
                     {departments.map((dept) => (
-                      <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                      <MenuItem key={dept} value={dept}>
+                        {dept}
+                      </MenuItem>
                     ))}
                   </TextField>
                 </Grid>
@@ -493,12 +552,20 @@ const ManageUsers = () => {
                   <TextField
                     fullWidth
                     type="password"
-                    label={editingUser ? 'New Password (leave blank to keep current)' : 'Password'}
+                    label={
+                      editingUser
+                        ? 'New Password (leave blank to keep current)'
+                        : 'Password'
+                    }
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
                     required={!editingUser}
-                    helperText={editingUser ? 'Leave blank to keep current password' : 'Min 6 characters'}
+                    helperText={
+                      editingUser
+                        ? 'Leave blank to keep current password'
+                        : 'Min 6 characters'
+                    }
                   />
                 </Grid>
               </Grid>
@@ -513,8 +580,8 @@ const ManageUsers = () => {
         </Dialog>
 
         {/* Delete Confirmation */}
-        <Dialog 
-          open={deleteDialog.open} 
+        <Dialog
+          open={deleteDialog.open}
           onClose={() => setDeleteDialog({ open: false, userId: null, userName: '' })}
           maxWidth="sm"
           fullWidth
@@ -525,7 +592,7 @@ const ManageUsers = () => {
           </DialogTitle>
           <DialogContent>
             <Typography>
-              Are you sure you want to delete <strong>{deleteDialog.userName}</strong>? 
+              Are you sure you want to delete <strong>{deleteDialog.userName}</strong>?
               <br />
               <Typography component="span" color="error" variant="body2">
                 This action cannot be undone.
@@ -533,7 +600,9 @@ const ManageUsers = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setDeleteDialog({ open: false, userId: null, userName: '' })}>
+            <Button
+              onClick={() => setDeleteDialog({ open: false, userId: null, userName: '' })}
+            >
               Cancel
             </Button>
             <Button onClick={handleDeleteUser} color="error" variant="contained">
@@ -542,16 +611,15 @@ const ManageUsers = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={6000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <Alert 
-            onClose={() => setSnackbar({ ...snackbar, open: false })} 
-            severity={snackbar.severity} 
+          <Alert
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
+            severity={snackbar.severity}
             sx={{ width: '100%' }}
           >
             {snackbar.message}

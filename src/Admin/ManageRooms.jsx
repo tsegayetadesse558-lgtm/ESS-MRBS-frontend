@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -23,6 +23,8 @@ import {
   IconButton,
   Snackbar,
   Grid,
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,29 +32,34 @@ import {
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
   Close as CloseIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
-import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axios';
 
 const ManageRooms = () => {
-  const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [pageError, setPageError] = useState('');
+  const [dialogError, setDialogError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, roomId: null, roomName: '' });
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    roomId: null,
+    roomName: '',
+  });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [processingId, setProcessingId] = useState(null);
   const [formData, setFormData] = useState({
     buildingNumber: '',
     floorNumber: '',
     department: '',
     roomName: '',
     maxCapacity: '',
-    status: 'available',
     description: '',
-    amenities: [],
+    amenities: '',
   });
 
   const departments = [
@@ -63,8 +70,6 @@ const ManageRooms = () => {
     'Other Departments',
   ];
 
-  const statusOptions = ['available', 'booked', 'maintenance'];
-
   useEffect(() => {
     fetchRooms();
   }, []);
@@ -72,28 +77,35 @@ const ManageRooms = () => {
   const fetchRooms = async () => {
     try {
       setLoading(true);
-      setError('');
+      setPageError('');
       const response = await axiosInstance.get('/rooms');
-      console.log('📊 Rooms fetched:', response.data);
-      
-      // FIX: Check response structure
+
       if (response.data && response.data.success) {
         setRooms(response.data.data || []);
-      } else if (response.data && Array.isArray(response.data)) {
+      } else if (Array.isArray(response.data)) {
         setRooms(response.data);
       } else {
         setRooms([]);
       }
     } catch (err) {
       console.error('Error fetching rooms:', err);
-      setError(err.response?.data?.message || 'Failed to load rooms');
+      setPageError(err.response?.data?.message || 'Failed to load rooms');
       setRooms([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const filteredRooms = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rooms;
+    return rooms.filter((room) =>
+      (room.roomName || '').toLowerCase().includes(q)
+    );
+  }, [rooms, searchQuery]);
+
   const handleOpenDialog = (roomData = null) => {
+    setDialogError('');
     if (roomData) {
       setEditingRoom(roomData);
       setFormData({
@@ -102,10 +114,10 @@ const ManageRooms = () => {
         department: roomData.department || '',
         roomName: roomData.roomName || '',
         maxCapacity: roomData.maxCapacity || '',
-        status: roomData.status || 'available',
         description: roomData.description || '',
-        // FIX: Handle amenities properly - if it's an array, join with comma
-        amenities: Array.isArray(roomData.amenities) ? roomData.amenities.join(', ') : roomData.amenities || '',
+        amenities: Array.isArray(roomData.amenities)
+          ? roomData.amenities.join(', ')
+          : roomData.amenities || '',
       });
     } else {
       setEditingRoom(null);
@@ -115,9 +127,8 @@ const ManageRooms = () => {
         department: '',
         roomName: '',
         maxCapacity: '',
-        status: 'available',
         description: '',
-        amenities: [],
+        amenities: '',
       });
     }
     setDialogOpen(true);
@@ -126,17 +137,16 @@ const ManageRooms = () => {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingRoom(null);
+    setDialogError('');
     setFormData({
       buildingNumber: '',
       floorNumber: '',
       department: '',
       roomName: '',
       maxCapacity: '',
-      status: 'available',
       description: '',
-      amenities: [],
+      amenities: '',
     });
-    setError('');
   };
 
   const handleChange = (e) => {
@@ -146,23 +156,31 @@ const ManageRooms = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setDialogError('');
 
     try {
-      // FIX: Validate required fields
-      if (!formData.roomName || !formData.buildingNumber || !formData.floorNumber || !formData.department || !formData.maxCapacity) {
-        setError('Please fill in all required fields');
+      if (
+        !formData.roomName ||
+        !formData.buildingNumber ||
+        !formData.floorNumber ||
+        !formData.department ||
+        !formData.maxCapacity
+      ) {
+        setDialogError('Please fill in all required fields');
         return;
       }
 
-      // FIX: Prepare data with proper types
       const data = {
-        ...formData,
+        roomName: formData.roomName.trim(),
+        buildingNumber: formData.buildingNumber.trim(),
+        floorNumber: formData.floorNumber.trim(),
+        department: formData.department,
         maxCapacity: Number(formData.maxCapacity),
-        // FIX: Handle amenities - split comma separated string into array
-        amenities: typeof formData.amenities === 'string' 
-          ? formData.amenities.split(',').map(item => item.trim()).filter(Boolean)
-          : formData.amenities || [],
+        description: formData.description?.trim() || '',
+        amenities:
+          typeof formData.amenities === 'string'
+            ? formData.amenities.split(',').map((i) => i.trim()).filter(Boolean)
+            : formData.amenities || [],
       };
 
       if (editingRoom) {
@@ -177,7 +195,11 @@ const ManageRooms = () => {
       } else {
         const response = await axiosInstance.post('/rooms', data);
         if (response.data && response.data.success) {
-          setSnackbar({ open: true, message: '✅ Room created successfully', severity: 'success' });
+          setSnackbar({
+            open: true,
+            message: '✅ Room created — now bookable by all users',
+            severity: 'success',
+          });
           await fetchRooms();
           handleCloseDialog();
         } else {
@@ -186,15 +208,24 @@ const ManageRooms = () => {
       }
     } catch (err) {
       console.error('Error saving room:', err);
-      setError(err.response?.data?.message || err.message || 'Operation failed');
+      setDialogError(err.response?.data?.message || err.message || 'Operation failed');
     }
   };
 
+  // ---------- Delete room ----------
   const handleDeleteRoom = async () => {
+    const { roomId } = deleteDialog;
+    if (!roomId) return;
+
+    setProcessingId(roomId);
     try {
-      const response = await axiosInstance.delete(`/rooms/${deleteDialog.roomId}`);
+      const response = await axiosInstance.delete(`/rooms/${roomId}`);
       if (response.data && response.data.success) {
-        setSnackbar({ open: true, message: '🗑️ Room deleted successfully', severity: 'success' });
+        setSnackbar({
+          open: true,
+          message: '🗑️ Room deleted successfully',
+          severity: 'success',
+        });
         await fetchRooms();
       } else {
         throw new Error(response.data?.message || 'Failed to delete room');
@@ -203,27 +234,46 @@ const ManageRooms = () => {
       console.error('Error deleting room:', err);
       setSnackbar({
         open: true,
-        message: err.response?.data?.message || err.message || 'Failed to delete room',
+        message:
+          err.response?.data?.message ||
+          err.message ||
+          'Failed to delete room',
         severity: 'error',
       });
     } finally {
+      setProcessingId(null);
       setDeleteDialog({ open: false, roomId: null, roomName: '' });
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'available': return 'success';
-      case 'booked': return 'warning';
-      case 'maintenance': return 'error';
-      default: return 'default';
+  const openDeleteDialog = (room) => {
+    if (!room?._id) return;
+    setDeleteDialog({
+      open: true,
+      roomId: room._id,
+      roomName: room.roomName || 'this room',
+    });
+  };
+
+  const closeDeleteDialog = () =>
+    setDeleteDialog({ open: false, roomId: null, roomName: '' });
+
+  const getStatusChip = (status) => {
+    switch ((status || 'available').toLowerCase()) {
+      case 'available':
+        return <Chip label="Available" size="small" color="success" variant="outlined" />;
+      case 'booked':
+        return <Chip label="Booked" size="small" color="info" variant="outlined" />;
+      case 'maintenance':
+        return <Chip label="Maintenance" size="small" color="warning" variant="outlined" />;
+      case 'unavailable':
+        return <Chip label="Unavailable" size="small" color="default" variant="outlined" />;
+      default:
+        return <Chip label={status} size="small" variant="outlined" />;
     }
   };
 
-  // Handle snackbar close
-  const handleSnackbarClose = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
+  const handleSnackbarClose = () => setSnackbar({ ...snackbar, open: false });
 
   if (loading) {
     return (
@@ -240,33 +290,82 @@ const ManageRooms = () => {
     <>
       <Navbar />
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h4" fontWeight="bold">
-            Manage Rooms
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button 
-              variant="outlined" 
-              startIcon={<RefreshIcon />} 
-              onClick={fetchRooms}
-              disabled={loading}
-            >
+        {/* Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', md: 'center' },
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 2,
+            mb: 4,
+          }}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              Manage Rooms
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Create rooms — they become instantly bookable by all registered users.
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              width: { xs: '100%', md: 'auto' },
+            }}
+          >
+            {/* Search bar */}
+            <TextField
+              size="small"
+              placeholder="Search rooms by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              sx={{ minWidth: { xs: '100%', sm: 260 } }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchRooms} disabled={loading}>
               Refresh
             </Button>
-            <Button 
-              variant="contained" 
-              startIcon={<AddIcon />} 
-              onClick={() => handleOpenDialog()}
-            >
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
               Add Room
             </Button>
           </Box>
         </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-            {error}
+        {pageError && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setPageError('')}>
+            {pageError}
           </Alert>
+        )}
+
+        {searchQuery && (
+          <Box sx={{ mb: 2 }}>
+            <Chip
+              label={`Found ${filteredRooms.length} of ${rooms.length} room${rooms.length === 1 ? '' : 's'}`}
+              color="primary"
+              variant="outlined"
+              size="small"
+            />
+          </Box>
         )}
 
         <TableContainer component={Paper} elevation={3}>
@@ -279,104 +378,126 @@ const ManageRooms = () => {
                 <TableCell sx={{ color: 'white' }}>Department</TableCell>
                 <TableCell sx={{ color: 'white' }}>Capacity</TableCell>
                 <TableCell sx={{ color: 'white' }}>Status</TableCell>
-                <TableCell sx={{ color: 'white' }} align="center">Actions</TableCell>
+                <TableCell sx={{ color: 'white' }} align="center">
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {!rooms || rooms.length === 0 ? (
+              {filteredRooms.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
                     <Typography variant="body1" color="text.secondary" sx={{ py: 4 }}>
-                      No rooms found
+                      {rooms.length === 0
+                        ? 'No rooms found. Click "Add Room" to create one.'
+                        : `No rooms match "${searchQuery}".`}
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                rooms.map((room) => (
-                  <TableRow key={room._id || room.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="500">
-                        {room.roomName || 'N/A'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{room.buildingNumber || 'N/A'}</TableCell>
-                    <TableCell>{room.floorNumber || 'N/A'}</TableCell>
-                    <TableCell>{room.department || 'N/A'}</TableCell>
-                    <TableCell>{room.maxCapacity || 0}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={room.status || 'available'}
-                        size="small"
-                        color={getStatusColor(room.status)}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton 
-                        size="small" 
-                        color="primary" 
-                        onClick={() => handleOpenDialog(room)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => setDeleteDialog({ open: true, roomId: room._id, roomName: room.roomName })}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredRooms.map((room) => {
+                  const isProcessing = processingId === room._id;
+                  return (
+                    <TableRow key={room._id || room.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="500">
+                          {room.roomName || 'N/A'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{room.buildingNumber || 'N/A'}</TableCell>
+                      <TableCell>{room.floorNumber || 'N/A'}</TableCell>
+                      <TableCell>{room.department || 'N/A'}</TableCell>
+                      <TableCell>{room.maxCapacity || 0}</TableCell>
+                      <TableCell>{getStatusChip(room.status)}</TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                          {/* Edit */}
+                          <Tooltip title="Edit room">
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleOpenDialog(room)}
+                                disabled={isProcessing}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+
+                          {/* Delete */}
+                          <Tooltip title="Delete room">
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => openDeleteDialog(room)}
+                                disabled={isProcessing}
+                              >
+                                {isProcessing ? (
+                                  <CircularProgress size={18} />
+                                ) : (
+                                  <DeleteIcon />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </TableContainer>
 
-        {/* Add/Edit Dialog */}
+        {/* Add / Edit dialog */}
         <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
           <DialogTitle>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {editingRoom ? '✏️ Edit Room' : '➕ Add New Room'}
-              <IconButton onClick={handleCloseDialog}><CloseIcon /></IconButton>
+              <IconButton onClick={handleCloseDialog}>
+                <CloseIcon />
+              </IconButton>
             </Box>
           </DialogTitle>
           <DialogContent>
             <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-                  {error}
+              {dialogError && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError('')}>
+                  {dialogError}
                 </Alert>
               )}
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <TextField 
-                    fullWidth 
-                    label="Room Name" 
-                    name="roomName" 
-                    value={formData.roomName} 
-                    onChange={handleChange} 
-                    required 
+                  <TextField
+                    fullWidth
+                    label="Room Name"
+                    name="roomName"
+                    value={formData.roomName}
+                    onChange={handleChange}
+                    required
                   />
                 </Grid>
                 <Grid item xs={6}>
-                  <TextField 
-                    fullWidth 
-                    label="Building Number" 
-                    name="buildingNumber" 
-                    value={formData.buildingNumber} 
-                    onChange={handleChange} 
-                    required 
+                  <TextField
+                    fullWidth
+                    label="Building Number"
+                    name="buildingNumber"
+                    value={formData.buildingNumber}
+                    onChange={handleChange}
+                    required
                   />
                 </Grid>
                 <Grid item xs={6}>
-                  <TextField 
-                    fullWidth 
-                    label="Floor Number" 
-                    name="floorNumber" 
-                    value={formData.floorNumber} 
-                    onChange={handleChange} 
-                    required 
+                  <TextField
+                    fullWidth
+                    label="Floor Number"
+                    name="floorNumber"
+                    value={formData.floorNumber}
+                    onChange={handleChange}
+                    required
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -389,41 +510,29 @@ const ManageRooms = () => {
                     onChange={handleChange}
                     required
                   >
-                    {departments.map(dept => (
-                      <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                    {departments.map((dept) => (
+                      <MenuItem key={dept} value={dept}>
+                        {dept}
+                      </MenuItem>
                     ))}
                   </TextField>
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField 
-                    fullWidth 
-                    type="number" 
-                    label="Max Capacity" 
-                    name="maxCapacity" 
-                    value={formData.maxCapacity} 
-                    onChange={handleChange} 
-                    required 
-                    inputProps={{ min: 1 }} 
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Max Capacity"
+                    name="maxCapacity"
+                    value={formData.maxCapacity}
+                    onChange={handleChange}
+                    required
+                    inputProps={{ min: 1 }}
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    select
-                    label="Status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                  >
-                    {statusOptions.map(opt => (
-                      <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Description"
+                    label="Description (optional)"
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
@@ -434,11 +543,11 @@ const ManageRooms = () => {
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Amenities (comma separated)"
+                    label="Amenities (optional, comma-separated)"
                     name="amenities"
                     value={formData.amenities}
                     onChange={handleChange}
-                    placeholder="Projector, WiFi, Whiteboard"
+                    placeholder="Projector, Whiteboard, Wi-Fi"
                   />
                 </Grid>
               </Grid>
@@ -446,46 +555,42 @@ const ManageRooms = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button 
-              onClick={handleSubmit} 
-              variant="contained"
-              disabled={loading}
-            >
+            <Button onClick={handleSubmit} variant="contained" disabled={loading}>
               {editingRoom ? 'Update' : 'Create'}
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Delete Confirmation */}
-        <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, roomId: null, roomName: '' })}>
-          <DialogTitle>🗑️ Delete Room</DialogTitle>
+        {/* Delete confirmation dialog */}
+        <Dialog open={deleteDialog.open} onClose={closeDeleteDialog} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DeleteIcon color="error" />
+            Delete Room
+          </DialogTitle>
           <DialogContent>
             <Typography>
-              Are you sure you want to delete <strong>{deleteDialog.roomName}</strong>? This action cannot be undone.
+              Are you sure you want to delete <strong>{deleteDialog.roomName}</strong>?
+              <br />
+              <Typography component="span" color="error" variant="body2">
+                This action cannot be undone.
+              </Typography>
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setDeleteDialog({ open: false, roomId: null, roomName: '' })}>
-              Cancel
-            </Button>
+            <Button onClick={closeDeleteDialog}>Cancel</Button>
             <Button onClick={handleDeleteRoom} color="error" variant="contained">
-              Delete
+              Yes, Delete
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Snackbar */}
-        <Snackbar 
-          open={snackbar.open} 
-          autoHideDuration={6000} 
-          onClose={handleSnackbarClose} 
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleSnackbarClose}
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <Alert 
-            onClose={handleSnackbarClose} 
-            severity={snackbar.severity} 
-            sx={{ width: '100%' }}
-          >
+          <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
             {snackbar.message}
           </Alert>
         </Snackbar>

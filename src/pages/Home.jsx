@@ -1,172 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
   Box,
   Button,
-  Paper,
   Grid,
-  Card,
-  CardContent,
-  Avatar,
-  Chip,
+  Paper,
   Stack,
   Divider,
   Fade,
-  Zoom,
 } from '@mui/material';
 import {
-  MeetingRoom,
   Login as LoginIcon,
-  BookOnline,
-  TrendingUp,
-  Schedule,
-  CheckCircle,
-  EventAvailable,
-  PlayCircle,
-  CalendarToday,
-  Notifications,
-  People,
-  Analytics,
-  Security,
-  Speed,
-  Star,
-  Verified,
-  Business,
-  School,
-  Public,
-  Apartment,
-  AutoAwesome,
+  MeetingRoom,
+  AccessTime as AccessTimeIcon,
+  Security as SecurityIcon,
+  BarChart as BarChartIcon,
+  CheckCircleOutline,
 } from '@mui/icons-material';
-import { motion, useAnimation, useInView } from 'framer-motion';
 import Navbar from '../components/Navbar';
-import ImageSlideshow from '../components/ImageSlideshow'; // ADD THIS IMPORT
+import ImageSlideshow from '../components/ImageSlideshow';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axios';
 
 // ============================================
-// ANIMATION COMPONENTS
+// DATA DIRECTLY FROM PROJECT REPORT (Chapter 1.3.2 Goals)
 // ============================================
-
-const AnimatedSection = ({ children, delay = 0 }) => {
-  const controls = useAnimation();
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, amount: 0.2 });
-
-  useEffect(() => {
-    if (inView) {
-      controls.start('visible');
-    }
-  }, [controls, inView]);
-
-  return (
-    <motion.div
-      ref={ref}
-      initial="hidden"
-      animate={controls}
-      variants={{
-        hidden: { opacity: 0, y: 50 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.8, delay } },
-      }}
-    >
-      {children}
-    </motion.div>
-  );
-};
-
-const AnimatedCounter = ({ target, duration = 2000 }) => {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (inView) {
-      let start = 0;
-      const increment = target / (duration / 16);
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= target) {
-          setCount(target);
-          clearInterval(timer);
-        } else {
-          setCount(Math.floor(start));
-        }
-      }, 16);
-      return () => clearInterval(timer);
-    }
-  }, [inView, target, duration]);
-
-  return <span ref={ref}>{count.toLocaleString()}</span>;
-};
-
-// ============================================
-// DATA
-// ============================================
-
 const features = [
-  { icon: <MeetingRoom />, title: 'Smart Room Booking', desc: 'Intelligent room suggestions based on your preferences', color: '#1976d2' },
-  { icon: <Schedule />, title: 'Real-Time Availability', desc: 'See live room availability and book instantly', color: '#2e7d32' },
-  { icon: <CalendarToday />, title: 'Interactive Calendar', desc: 'Visual calendar view for easy scheduling', color: '#ed6c02' },
-  { icon: <Notifications />, title: 'Instant Notifications', desc: 'Real-time alerts for booking confirmations', color: '#9c27b0' },
-  { icon: <Analytics />, title: 'Advanced Analytics', desc: 'Track room utilization and generate reports', color: '#d32f2f' },
-  { icon: <Security />, title: 'Secure Authentication', desc: 'Enterprise-grade security with role-based access', color: '#1976d2' },
-];
-
-const testimonials = [
   {
-    name: 'Beker Shale Dulle (Phd)',
-    position: 'General Director',
-    feedback: 'ESS MRBS has revolutionized how we manage our meeting spaces. The efficiency gains are remarkable!',
+    icon: <MeetingRoom sx={{ fontSize: 32, color: '#1565c0' }} />,
+    title: 'Centralized Management',
+    desc: 'Consolidate all booking activities through a single platform, simplifying administrative oversight and reducing manual coordination efforts.',
   },
   {
-    name: 'Meron Kifelew (Phd)',
-    position: 'Statistica Digitalization Division',
-    feedback: 'The best meeting room booking system we have ever used. Seamless integration and intuitive design.',
+    icon: <AccessTimeIcon sx={{ fontSize: 32, color: '#1565c0' }} />,
+    title: 'Eliminate Conflicts',
+    desc: 'Ensure that no two bookings overlap for the same room through automated availability validation and comprehensive overlap detection logic.',
   },
   {
-    name: 'Didimos Ayele Kebede',
-    position: 'Information Technology and Infrastructure Development Chief Executive Officer',
-    feedback: 'Managing 100+ meeting rooms across multiple locations has never been easier. Highly recommended!',
+    icon: <SecurityIcon sx={{ fontSize: 32, color: '#1565c0' }} />,
+    title: 'Secure Authentication',
+    desc: 'Role-based access control ensures that administrators and employees have the appropriate permissions, protecting sensitive data using JWT.',
+  },
+  {
+    icon: <BarChartIcon sx={{ fontSize: 32, color: '#1565c0' }} />,
+    title: 'Data-Driven Insights',
+    desc: 'Generate utilization reports and analytics that help management make informed decisions about resource allocation and capacity planning.',
   },
 ];
-
-// ============================================
-// MAIN COMPONENT - LANDING PAGE
-// ============================================
 
 const Home = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [stats, setStats] = useState({
-    totalRooms: 0,
-    availableRooms: 0,
-    totalBookings: 0,
-  });
   const [loading, setLoading] = useState(true);
-  const [hoveredCard, setHoveredCard] = useState(null);
   const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
+    // Checking API connection as per your technical constraints
+    const fetchData = async () => {
+      try {
+        await axiosInstance.get('/rooms');
+      } catch (error) {
+        console.error('Error connecting to API:', error);
+      } finally {
+        setLoading(false);
+        setAnimated(true);
+      }
+    };
     fetchData();
-    setAnimated(true);
   }, []);
-
-  const fetchData = async () => {
-    try {
-      const roomsRes = await axiosInstance.get('/rooms');
-      const rooms = roomsRes.data.data || [];
-      setStats({
-        totalRooms: rooms.length,
-        availableRooms: rooms.filter(r => r.status === 'available').length,
-        totalBookings: 12,
-      });
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -182,313 +85,264 @@ const Home = () => {
   return (
     <>
       <Navbar />
-      <Box sx={{ bgcolor: '#f5f7fa', minHeight: '100vh', overflow: 'hidden' }}>
+      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', overflow: 'hidden', position: 'relative' }}>
+        
+        {/* DECORATIVE BACKGROUND SHAPES */}
+        <Box sx={{ position: 'absolute', top: 0, left: 0, width: 200, height: 200, overflow: 'hidden', zIndex: 0 }}>
+          <Box sx={{ position: 'absolute', top: -50, left: -50, width: 150, height: 150, bgcolor: '#e3f2fd', transform: 'rotate(45deg)' }} />
+          <Box sx={{ position: 'absolute', top: 80, left: -50, width: 100, height: 100, bgcolor: '#0d47a1', transform: 'rotate(45deg)' }} />
+        </Box>
 
-        {/* ==========================================
-            IMAGE SLIDESHOW - RIGHT BELOW NAVBAR
-            ========================================== */}
-        <ImageSlideshow />
+        {/* IMAGE SLIDESHOW (Existing Component) */}
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <ImageSlideshow />
+        </Box>
 
-        {/* ==========================================
-            HERO SECTION
-            ========================================== */}
-        <Box
-          sx={{
-            background: 'linear-gradient(135deg, #0a1628 0%, #0d47a1 40%, #1565c0 70%, #42a5f5 100%)',
-            color: 'white',
-            py: { xs: 8, md: 14 },
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {[...Array(30)].map((_, i) => (
-            <Box
-              key={i}
-              sx={{
-                position: 'absolute',
-                width: Math.random() * 6 + 2,
-                height: Math.random() * 6 + 2,
-                background: 'rgba(255,255,255,0.08)',
-                borderRadius: '50%',
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                animation: `float ${Math.random() * 15 + 5}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 5}s`,
-              }}
-            />
-          ))}
-
-          <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+        {/* HERO SECTION */}
+        <Box sx={{ bgcolor: '#0c2b69', color: 'white', py: { xs: 8, md: 10 }, position: 'relative', zIndex: 1 }}>
+          <Container maxWidth="lg">
             <Fade in={animated} timeout={1000}>
               <Box textAlign="center">
-                <motion.div
-                  initial={{ y: -30, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ duration: 0.8 }}>
-                </motion.div>
-
-                <motion.div
-                  initial={{ y: -20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ duration: 0.8, delay: 0.2 }}
-                >
-                  <Typography
-                    variant="h1"
-                    fontWeight="700"
-                    sx={{
-                      fontSize: { xs: '0.2rem', md: '1.8rem', lg: '2.5rem' },
-                      mb: 2,
-                      lineHeight: 1.1,
-                      letterSpacing: '-0.02em',
-                    }} >
-                    <Box component="span" sx={{ color: '#85b8e2', display: 'block' }}>
-                      ESS Meeting Room Booking System
-                    </Box>
-                  </Typography>
-                </motion.div>
-
-                <motion.div
-                  initial={{ y: -10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ duration: 0.8, delay: 0.6 }}
-                >
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
-                    {!isAuthenticated && (
-                      <>
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <Button
-                            variant="contained"
-                            size="large"
-                            startIcon={<LoginIcon />}
-                            onClick={() => navigate('/login')}
-                            sx={{
-                              bgcolor: 'white',
-                              color: '#92b2e2',
-                              px: 5,
-                              py: 1.8,
-                              borderRadius: '50px',
-                              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                              transition: 'all 0.3s ease',
-                              '&:hover': {
-                                bgcolor: '#f5f5f5',
-                                transform: 'translateY(-3px)',
-                                boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
-                              },
-                            }}
-                          >
-                            Login to Get Started
-                          </Button>
-                        </motion.div>
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                        </motion.div>
-                      </>
-                    )}
-                  </Stack>
-                </motion.div>
-              </Box>
-            </Fade>
-          </Container>
-        </Box><br/>
-
-        {/* ==========================================
-            STATS CARDS
-            ========================================== */}
-        <Container maxWidth="lg" sx={{ mt: -4, position: 'relative', zIndex: 2 }}>
-          <Grid container spacing={10}>
-            {[
-              { icon: <MeetingRoom />, value: stats.totalRooms, label: 'Total Rooms', color: '#1976d2' },
-              { icon: <EventAvailable />, value: stats.availableRooms, label: 'Available Rooms', color: '#2e7d32' },
-              { icon: <BookOnline />, value: stats.totalBookings, label: 'Total Bookings', color: '#ed6c02' },
-              { icon: <People />, value: 10, label: 'Active Users', color: '#9c27b0' },
-            ].map((stat, i) => (
-              <Grid item xs={6} md={3} key={i}>
-                <Zoom in={animated} style={{ transitionDelay: `${i * 0.1}s` }}>
-                  <Paper
-                    sx={{
-                      p: 3,
-                      textAlign: 'center',
-                      borderRadius: 2,
-                      background: 'white',
-                      border: '1px solid #e0e0e0',
-                      transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      '&:hover': {
-                        transform: 'translateY(-8px) scale(1.02)',
-                        boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
-                        borderColor: stat.color,
-                      },
-                    }}
-                  >
-                    <Box sx={{ color: stat.color, fontSize: 10, mb: 1 }}>{stat.icon}</Box>
-                    <Typography variant="h3" fontWeight="bold" color={stat.color}>
-                      <AnimatedCounter target={stat.value} />
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">{stat.label}</Typography>
-                  </Paper>
-                </Zoom>
-              </Grid>
-            ))}
-          </Grid>
-        </Container><br/>
-
-        {/* ==========================================
-            FEATURES
-            ========================================== */}
-        <Box sx={{ bgcolor: 'white', py: 8 }}>
-          <Container maxWidth="lg">
-            <AnimatedSection>
-              <Typography variant="h4" fontWeight="600" textAlign="center" gutterBottom>
-                Everything You Need to Manage Meeting Rooms
-              </Typography>
-            </AnimatedSection>
-
-            <Grid container spacing={3} sx={{ mt: 2 }}>
-              {features.map((feature, i) => (
-                <Grid item xs={12} sm={6} md={4} key={i}>
-                  <AnimatedSection delay={i * 0.1}>
-                    <motion.div
-                      whileHover={{ y: -10, scale: 1.02 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                      onMouseEnter={() => setHoveredCard(i)}
-                      onMouseLeave={() => setHoveredCard(null)}
-                    >
-                      <Card
-                        sx={{
-                          p: 3,
-                          height: '100%',
-                          borderRadius: 4,
-                          border: `2px solid ${hoveredCard === i ? feature.color : 'transparent'}`,
-                          transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                          boxShadow: hoveredCard === i ? `0 12px 40px ${feature.color}30` : 'none',
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 3,
-                            bgcolor: `${feature.color}15`,
-                            color: feature.color,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 32,
-                            mb: 2,
-                            transition: 'all 0.3s ease',
-                            transform: hoveredCard === i ? 'scale(1.1) rotate(5deg)' : 'scale(1)',
-                          }}
-                        >
-                          {feature.icon}
-                        </Box>
-                        <Typography variant="h6" fontWeight="600" sx={{ mb: 1 }}>
-                          {feature.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {feature.desc}
-                        </Typography>
-                      </Card>
-                    </motion.div>
-                  </AnimatedSection>
-                </Grid>
-              ))}
-            </Grid>
-          </Container>
-        </Box>
-
-        {/* ==========================================
-            TESTIMONIALS
-            ========================================== */}
-        <Box sx={{ bgcolor: '#f5f7fa', py: 6 }}>
-          <Container maxWidth="lg">
-            <AnimatedSection>
-              <Typography variant="h5" fontWeight="600" textAlign="center" gutterBottom>
-                What Our Users Say
-              </Typography>
-            </AnimatedSection>
-            <Grid container spacing={5} sx={{ mt: 2 }}>
-              {testimonials.map((t, i) => (
-                <Grid item xs={12} md={4} key={i}>
-                  <AnimatedSection delay={i * 0.2}>
-                    <Card sx={{ p: 3, height: '100%', borderRadius: 4, border: '1px solid #e0e0e0' }}>
-                      <Box sx={{ display: 'flex', gap: 0.5, mb: 2 }}>
-                        {[...Array(5)].map((_, j) => <Star key={j} sx={{ color: '#ffb400' }} />)}
-                      </Box>
-                      <Typography sx={{ fontStyle: 'italic', mb: 2 }}>"{t.feedback}"</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>{t.name.charAt(0)}</Avatar>
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="600">{t.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{t.position}, {t.organization}</Typography>
-                        </Box>
-                      </Box>
-                    </Card>
-                  </AnimatedSection>
-                </Grid>
-              ))}
-            </Grid>
-          </Container>
-        </Box>
-
-        {/* ==========================================
-            CTA
-            ========================================== */}
-        <Box
-          sx={{
-            background: 'linear-gradient(135deg, #0a1628 0%, #0d47a1 50%, #1565c0 100%)',
-            color: 'white',
-            py: 10,
-            textAlign: 'center',
-          }}
-        >
-          <Container maxWidth="md">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}   >
-              {!isAuthenticated && (
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Typography variant="h6" sx={{ color: '#85b8e2', fontWeight: 500, letterSpacing: '0.15em', mb: 1 }}>
+                  የኢትዮጵያ ስታቲስቲክስ አገልግሎት
+                </Typography>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 400, letterSpacing: '0.1em', mb: 4 }}>
+                  ETHIOPIAN STATISTICAL SERVICE
+                </Typography>
+                {!isAuthenticated && (
                   <Button
                     variant="contained"
                     size="large"
                     startIcon={<LoginIcon />}
                     onClick={() => navigate('/login')}
                     sx={{
-                      bgcolor: 'white',
-                      color: '#0d47a1',
-                      px: 6,
-                      py: 1.8,
-                      borderRadius: '50px',
-                      '&:hover': { bgcolor: '#f5f5f5' },
+                      bgcolor: 'white', color: '#1a2a5e', px: 5, py: 1.5, borderRadius: '50px',
+                      fontWeight: 600, '&:hover': { bgcolor: '#f5f5f5', transform: 'translateY(-2px)' },
+                      transition: 'all 0.3s ease'
                     }}
                   >
-                    Get Started
+                    Login to Access System
                   </Button>
-                </motion.div>
-              )}
-            </motion.div>
+                )}
+              </Box>
+            </Fade>
           </Container>
         </Box>
 
         {/* ==========================================
-            FOOTER
+            PROFESSIONAL FEATURES SECTION
             ========================================== */}
-        <Box sx={{ bgcolor: '#0a1628', color: 'rgba(255,255,255,0.7)', py: 4 }}>
+        <Box sx={{ py: { xs: 6, md: 10 }, position: 'relative' }}>
           <Container maxWidth="lg">
-            <Divider sx={{ mb: 4, borderColor: 'rgba(255,255,255,0.06)' }} />
-            <Typography variant="body2" textAlign="center">
-              © 2026 ESS MRBS. All rights reserved. Built with ❤️
+            
+            <Box textAlign="center" mb={6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2 }}>
+                <Divider sx={{ width: 60, bgcolor: '#1565c0', height: 2 }} />
+                <Typography variant="overline" sx={{ color: '#1565c0', fontWeight: 700, letterSpacing: '0.1em' }}>
+                  ESS-MRBS PLATFORM
+                </Typography>
+                <Divider sx={{ width: 60, bgcolor: '#1565c0', height: 2 }} />
+              </Box>
+              <Typography variant="h3" fontWeight="800" sx={{ color: '#0d47a1', mb: 2, fontSize: { xs: '2rem', md: '2.8rem' } }}>
+                A Smarter Way to Manage Meeting Spaces
+              </Typography>
+              <Typography variant="h6" sx={{ color: '#546e7a', fontWeight: 400, fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                Automating room reservation management, eliminating scheduling conflicts, and providing real-time visibility.
+              </Typography>
+            </Box>
+
+            <Grid container spacing={4} alignItems="stretch">
+              
+              {/* LEFT SIDE: Visual Graphic */}
+              <Grid item xs={12} md={6}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    height: '100%',
+                    minHeight: '400px',
+                    borderRadius: 4,
+                    backgroundImage: 'url(https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    border: '1px solid #e0e0e0',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      background: 'linear-gradient(to top, rgba(13, 71, 161, 0.8), rgba(13, 71, 161, 0.1))'
+                    }
+                  }}
+                >
+                  {/* Floating Mockup Card representing real data */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 30,
+                      right: 30,
+                      bgcolor: 'white',
+                      p: 3,
+                      borderRadius: 3,
+                      width: '280px',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: '#0d47a1' }}>
+                      Real-Time Availability
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
+                      <Box sx={{ p: 1, bgcolor: '#e8f5e9', borderRadius: 1, borderLeft: '4px solid #2e7d32' }}>
+                        <Typography variant="caption" fontWeight="bold" color="#2e7d32">Meeting Room 101</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>Available Today</Typography>
+                      </Box>
+                      <Box sx={{ p: 1, bgcolor: '#ffebee', borderRadius: 1, borderLeft: '4px solid #c62828' }}>
+                        <Typography variant="caption" fontWeight="bold" color="#c62828">Meeting Room 203</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>Double Booking Prevented</Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* RIGHT SIDE: 2x2 Feature Grid */}
+              <Grid item xs={12} md={6}>
+                <Grid container spacing={2.5}>
+                  {features.map((feature, i) => (
+                    <Grid item xs={12} sm={6} key={i}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 3,
+                          height: '100%',
+                          borderRadius: 3,
+                          border: '1px solid #e0e0e0',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#90caf9',
+                            boxShadow: '0 8px 24px rgba(21, 101, 192, 0.08)',
+                            transform: 'translateY(-3px)'
+                          }
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: '50%',
+                            bgcolor: '#e3f2fd',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2
+                          }}
+                        >
+                          {feature.icon}
+                        </Box>
+                        <Typography variant="h6" fontWeight="bold" sx={{ mb: 1, color: '#1a237e', fontSize: '1.1rem' }}>
+                          {feature.title}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#546e7a', lineHeight: 1.6 }}>
+                          {feature.desc}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Grid>
+            </Grid>
+          </Container>
+        </Box>
+
+        {/* ==========================================
+            BOTTOM BANNER (Badges)
+            ========================================== */}
+        <Box sx={{ bgcolor: '#f0f4f8', py: 4, borderTop: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
+          <Container maxWidth="lg">
+            <Grid container justifyContent="center" alignItems="center" spacing={4}>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  <Box sx={{ p: 1.5, bgcolor: '#e3f2fd', borderRadius: '50%' }}>
+                    <MeetingRoom sx={{ color: '#1565c0' }} />
+                  </Box>
+                  <Typography variant="subtitle1" fontWeight="600" color="#1a237e">Centralized Booking</Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item md={0.5} sx={{ display: { xs: 'none', md: 'block' } }}>
+                <Divider orientation="vertical" sx={{ height: 30 }} />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  <Box sx={{ p: 1.5, bgcolor: '#e3f2fd', borderRadius: '50%' }}>
+                    <CheckCircleOutline sx={{ color: '#1565c0' }} />
+                  </Box>
+                  <Typography variant="subtitle1" fontWeight="600" color="#1a237e">Zero Double Bookings</Typography>
+                </Box>
+              </Grid>
+
+              <Grid item md={0.5} sx={{ display: { xs: 'none', md: 'block' } }}>
+                <Divider orientation="vertical" sx={{ height: 30 }} />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  <Box sx={{ p: 1.5, bgcolor: '#e3f2fd', borderRadius: '50%' }}>
+                    <AccessTimeIcon sx={{ color: '#1565c0' }} />
+                  </Box>
+                  <Typography variant="subtitle1" fontWeight="600" color="#1a237e">Real-Time Visibility</Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Container>
+        </Box>
+
+        {/* FOOTER (Original ESS Information from Document) */}
+        <Box sx={{ bgcolor: '#0a255c', color: 'rgba(255,255,255,0.7)', py: 5 }}>
+          <Container maxWidth="lg">
+            <Grid container spacing={4} sx={{ mb: 4 }}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                  የኢትዮጵያ ስታቲስቲክስ አገልግሎት
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', mb: 3 }}>
+                  ETHIOPIAN STATISTICAL SERVICE
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.3)', mb: 1, fontSize: '0.8rem' }}>HEADQUARTERS</Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', mb: 0.5 }}>2QH3+9P8, Churchill Road, Addis Ababa</Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', mb: 0.5 }}>Tele: +251-11553112, +251-11553011</Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', mb: 0.5 }}>P.O.Box: 1143</Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem' }}>Email: info@ess.gov.et</Typography>
+              </Grid>
+              
+              <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                <Box>
+                  <Typography variant="body2" sx={{ color: 'white', fontWeight: 600, mb: 2 }}>Quick Links</Typography>
+                  {['Home', 'About', 'Contact'].map((link) => (
+                    <Typography
+                      key={link}
+                      variant="body2"
+                      onClick={() => {
+                        if (link === 'Home') window.scrollTo({ top: 0, behavior: 'smooth' });
+                        else if (link === 'About') navigate('/about');
+                        else if (link === 'Contact') navigate('/contact');
+                      }}
+                      sx={{ color: 'rgba(255,255,255,0.5)', cursor: 'pointer', py: 0.5, fontSize: '0.85rem', '&:hover': { color: '#85b8e2' } }}
+                    >
+                      {link}
+                    </Typography>
+                  ))}
+                </Box>
+              </Grid>
+            </Grid>
+            <Divider sx={{ mb: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
+            <Typography variant="body2" textAlign="center" sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>
+              © 2026 All Rights Reserved. Ethiopian Statistical Service
             </Typography>
           </Container>
         </Box>
 
-        <style>
-          {`
-            @keyframes float {
-              0%, 100% { transform: translateY(0) rotate(0deg); }
-              50% { transform: translateY(-20px) rotate(3deg); }
-            }
-          `}
-        </style>
       </Box>
     </>
   );

@@ -18,7 +18,6 @@ import {
   Room,
   Assessment,
   EventAvailable,
-  CheckCircle,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -48,27 +47,19 @@ const AdminDashboard = () => {
       setLoading(true);
       setError('');
 
-      const usersRes = await axiosInstance.get('/users');
+      const [usersRes, roomsRes, bookingsRes] = await Promise.all([
+        axiosInstance.get('/users'),
+        axiosInstance.get('/rooms'),
+        axiosInstance.get('/bookings'),
+      ]);
+
       const users = usersRes.data.data || [];
-
-      const roomsRes = await axiosInstance.get('/rooms');
       const rooms = roomsRes.data.data || [];
-
-      const bookingsRes = await axiosInstance.get('/bookings');
       const bookings = bookingsRes.data.data || [];
 
-      // ✅ Booking statistics (room-based workflow)
-      const confirmedBookings = bookings.filter(
-        (b) => b.status === 'confirmed'
-      ).length;
-      const rejectedBookings = bookings.filter(
-        (b) => b.status === 'rejected'
-      ).length;
-      const cancelledBookings = bookings.filter(
-        (b) => b.status === 'cancelled'
-      ).length;
+      const confirmedBookings = bookings.filter((b) => b.status === 'confirmed').length;
+      const cancelledBookings = bookings.filter((b) => b.status === 'cancelled').length;
 
-      // ✅ Bookings happening today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayBookings = bookings.filter((b) => {
@@ -83,7 +74,6 @@ const AdminDashboard = () => {
         totalRooms: rooms.length,
         totalBookings: bookings.length,
         confirmedBookings,
-        rejectedBookings,
         cancelledBookings,
         todayBookings,
       });
@@ -97,19 +87,12 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
         <Navbar />
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '80vh',
-          }}
-        >
+        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <CircularProgress />
         </Box>
-      </>
+      </Box>
     );
   }
 
@@ -117,179 +100,186 @@ const AdminDashboard = () => {
     {
       title: 'Total Users',
       value: stats.totalUsers,
-      icon: <People sx={{ fontSize: 40 }} />,
+      icon: <People sx={{ fontSize: { xs: 32, md: 40 } }} />,
       color: '#0d59a6',
       action: '/admin/users',
     },
     {
       title: 'Total Rooms',
       value: stats.totalRooms,
-      icon: <MeetingRoom sx={{ fontSize: 40 }} />,
+      icon: <MeetingRoom sx={{ fontSize: { xs: 32, md: 40 } }} />,
       color: '#0a5b9e',
       action: '/admin/rooms',
     },
     {
       title: 'Total Bookings',
       value: stats.totalBookings,
-      icon: <BookOnline sx={{ fontSize: 40 }} />,
+      icon: <BookOnline sx={{ fontSize: { xs: 32, md: 40 } }} />,
       color: '#0a5ea3',
       action: '/admin/bookings',
     },
     {
       title: "Today's Bookings",
       value: stats.todayBookings,
-      icon: <EventAvailable sx={{ fontSize: 40 }} />,
+      icon: <EventAvailable sx={{ fontSize: { xs: 32, md: 40 } }} />,
       color: '#064d9e',
       action: '/admin/bookings',
     },
   ];
 
   return (
-    <>
+    // ✅ The outer Box ensures the background fills the whole screen perfectly
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
       <Navbar />
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Admin Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Welcome back, {user?.fullName || 'Admin'}! Here is an overview of the
-            system.
-          </Typography>
-        </Box>
+      
+      {/* ✅ flexGrow: 1 pushes the footer down and stretches the content area */}
+      <Box sx={{ flexGrow: 1, py: { xs: 3, md: 4 } }}>
+        <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 } }}>
+          
+          <Box sx={{ mb: { xs: 3, md: 4 } }}>
+            <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ fontSize: { xs: '2rem', md: '2.125rem' } }}>
+              Admin Dashboard
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Welcome back, {user?.fullName || 'Admin'}! Here is an overview of the system.
+            </Typography>
+          </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 4 }}>
-            {error}
-          </Alert>
-        )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 4 }}>
+              {error}
+            </Alert>
+          )}
 
-        {/* Stat cards */}
-        <Grid container spacing={3} sx={{ mb: 5 }}>
-          {statCards.map((stat, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Paper
-                elevation={2}
-                sx={{
-                  p: 3,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderRadius: 2,
-                  cursor: stat.action ? 'pointer' : 'default',
-                  '&:hover': { boxShadow: stat.action ? 6 : 2 },
-                }}
-                onClick={() => stat.action && navigate(stat.action)}
+          {/* Stat cards */}
+          <Grid container spacing={2} sx={{ mb: { xs: 4, md: 5 } }}>
+            {statCards.map((stat, index) => (
+              <Grid item xs={12} sm={6} md={3} key={index}>
+                <Paper
+                  elevation={1}
+                  sx={{
+                    p: { xs: 2, md: 3 },
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderRadius: 2,
+                    cursor: stat.action ? 'pointer' : 'default',
+                    transition: 'all 0.2s',
+                    '&:hover': { boxShadow: stat.action ? 4 : 1, transform: 'translateY(-2px)' },
+                  }}
+                  onClick={() => stat.action && navigate(stat.action)}
+                >
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '2rem', md: '2.125rem' } }}>
+                      {stat.value}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {stat.title}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ color: stat.color }}>{stat.icon}</Box>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Quick Actions */}
+          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+            Quick Actions
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: { xs: 4, md: 5 } }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="large"
+                startIcon={<PersonAdd />}
+                onClick={() => navigate('/admin/users')}
+                sx={{ py: 1.5, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
               >
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stat.value}
+                Manage Users
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="large"
+                startIcon={<Room />}
+                onClick={() => navigate('/admin/rooms')}
+                sx={{ py: 1.5, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
+              >
+                Manage Rooms
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="large"
+                startIcon={<BookOnline />}
+                onClick={() => navigate('/admin/bookings')}
+                sx={{ py: 1.5, bgcolor: '#094381', '&:hover': { bgcolor: '#0e76e6' } }}
+              >
+                Manage Bookings
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="large"
+                startIcon={<Assessment />}
+                onClick={() => navigate('/admin/reports')}
+                sx={{ py: 1.5, bgcolor: '#094883', '&:hover': { bgcolor: '#1284e2' } }}
+              >
+                View Reports
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Booking Statistics */}
+          <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
+              Booking Statistics
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={4}>
+                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f0fdf4', borderRadius: 1 }}>
+                  <Typography variant="h5" color="success.main" fontWeight="bold">
+                    {stats.confirmedBookings}
                   </Typography>
-                  <Typography variant="body2" color="#060f19">
-                    {stat.title}
+                  <Typography variant="body2" color="text.secondary">
+                    Confirmed
                   </Typography>
                 </Box>
-                <Box sx={{ color: stat.color }}>{stat.icon}</Box>
-              </Paper>
+              </Grid>
+              <Grid item xs={4}>
+                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f3f4f6', borderRadius: 1 }}>
+                  <Typography variant="h5" color="text.secondary" fontWeight="bold">
+                    {stats.cancelledBookings}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Cancelled
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={4}>
+                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#eff6ff', borderRadius: 1 }}>
+                  <Typography variant="h5" color="info.main" fontWeight="bold">
+                    {stats.todayBookings}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Today
+                  </Typography>
+                </Box>
+              </Grid>
             </Grid>
-          ))}
-        </Grid>
+          </Paper>
 
-        {/* Quick Actions */}
-        <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
-          Quick Actions
-        </Typography>
-        <Grid container spacing={3} sx={{ mb: 5 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              startIcon={<PersonAdd />}
-              onClick={() => navigate('/admin/users')}
-              sx={{ py: 2, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
-            >
-              Manage Users
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              startIcon={<Room />}
-              onClick={() => navigate('/admin/rooms')}
-              sx={{ py: 2, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
-            >
-              Manage Rooms
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              startIcon={<BookOnline />}
-              onClick={() => navigate('/admin/bookings')}
-              sx={{ py: 2, bgcolor: '#094381', '&:hover': { bgcolor: '#0e76e6' } }}
-            >
-              Manage Bookings
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              startIcon={<Assessment />}
-              onClick={() => navigate('/admin/reports')}
-              sx={{ py: 2, bgcolor: '#094883', '&:hover': { bgcolor: '#1284e2' } }}
-            >
-              View Reports
-            </Button>
-          </Grid>
-        </Grid>
-
-        {/* Booking Statistics */}
-        <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 4 }}>
-            Booking Statistics
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h5" color="success.main">
-                  {stats.confirmedBookings}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Confirmed
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h5" color="text.secondary">
-                  {stats.cancelledBookings}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Cancelled
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h5" color="info.main">
-                  {stats.todayBookings}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Today
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </Paper>
-      </Container>
-    </>
+        </Container>
+      </Box>
+    </Box>
   );
 };
 

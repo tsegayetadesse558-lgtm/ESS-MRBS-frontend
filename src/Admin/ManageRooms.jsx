@@ -39,6 +39,7 @@ import axiosInstance from '../api/axios';
 
 const ManageRooms = () => {
   const [rooms, setRooms] = useState([]);
+  const [bookings, setBookings] = useState([]); // Added to track live status
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const [dialogError, setDialogError] = useState('');
@@ -71,26 +72,27 @@ const ManageRooms = () => {
   ];
 
   useEffect(() => {
-    fetchRooms();
+    fetchData();
   }, []);
 
-  const fetchRooms = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setPageError('');
-      const response = await axiosInstance.get('/rooms');
+      
+      const [roomsRes, bookingsRes] = await Promise.all([
+        axiosInstance.get('/rooms'),
+        axiosInstance.get('/bookings')
+      ]);
 
-      if (response.data && response.data.success) {
-        setRooms(response.data.data || []);
-      } else if (Array.isArray(response.data)) {
-        setRooms(response.data);
-      } else {
-        setRooms([]);
-      }
+      setRooms(roomsRes.data?.data || roomsRes.data || []);
+      setBookings(bookingsRes.data?.data || bookingsRes.data || []);
+
     } catch (err) {
-      console.error('Error fetching rooms:', err);
-      setPageError(err.response?.data?.message || 'Failed to load rooms');
+      console.error('Error fetching data:', err);
+      setPageError(err.response?.data?.message || 'Failed to load data');
       setRooms([]);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -103,6 +105,32 @@ const ManageRooms = () => {
       (room.roomName || '').toLowerCase().includes(q)
     );
   }, [rooms, searchQuery]);
+
+  // ✅ Helper to determine live room status
+  const getRoomLiveStatus = (room) => {
+    if (room.status === 'maintenance') return 'maintenance';
+    if (room.status === 'unavailable') return 'unavailable';
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    const currentBooking = bookings.find((b) => {
+      // Handle populated vs unpopulated room ID
+      const bRoomId = b.room?._id || b.room;
+      if (bRoomId !== room._id) return false;
+      if (b.status !== 'confirmed') return false;
+
+      // Check if date matches today
+      const bDate = new Date(b.meetingDate).toISOString().split('T')[0];
+      if (bDate !== todayStr) return false;
+
+      // Check time overlap
+      const currentTimeStr = now.toTimeString().slice(0, 5); // "HH:MM"
+      return currentTimeStr >= b.startTime && currentTimeStr <= b.endTime;
+    });
+
+    return currentBooking ? 'booked' : 'available';
+  };
 
   const handleOpenDialog = (roomData = null) => {
     setDialogError('');
@@ -187,7 +215,7 @@ const ManageRooms = () => {
         const response = await axiosInstance.put(`/rooms/${editingRoom._id}`, data);
         if (response.data && response.data.success) {
           setSnackbar({ open: true, message: '✅ Room updated successfully', severity: 'success' });
-          await fetchRooms();
+          await fetchData();
           handleCloseDialog();
         } else {
           throw new Error(response.data?.message || 'Failed to update room');
@@ -200,7 +228,7 @@ const ManageRooms = () => {
             message: '✅ Room created — now bookable by all users',
             severity: 'success',
           });
-          await fetchRooms();
+          await fetchData();
           handleCloseDialog();
         } else {
           throw new Error(response.data?.message || 'Failed to create room');
@@ -226,7 +254,7 @@ const ManageRooms = () => {
           message: '🗑️ Room deleted successfully',
           severity: 'success',
         });
-        await fetchRooms();
+        await fetchData();
       } else {
         throw new Error(response.data?.message || 'Failed to delete room');
       }
@@ -234,10 +262,7 @@ const ManageRooms = () => {
       console.error('Error deleting room:', err);
       setSnackbar({
         open: true,
-        message:
-          err.response?.data?.message ||
-          err.message ||
-          'Failed to delete room',
+        message: err.response?.data?.message || err.message || 'Failed to delete room',
         severity: 'error',
       });
     } finally {
@@ -258,18 +283,18 @@ const ManageRooms = () => {
   const closeDeleteDialog = () =>
     setDeleteDialog({ open: false, roomId: null, roomName: '' });
 
-  const getStatusChip = (status) => {
-    switch ((status || 'available').toLowerCase()) {
+  const getStatusChip = (liveStatus) => {
+    switch (liveStatus) {
       case 'available':
         return <Chip label="Available" size="small" color="success" variant="outlined" />;
       case 'booked':
-        return <Chip label="Booked" size="small" color="info" variant="outlined" />;
+        return <Chip label="Booked Now" size="small" color="error" variant="filled" />;
       case 'maintenance':
         return <Chip label="Maintenance" size="small" color="warning" variant="outlined" />;
       case 'unavailable':
-        return <Chip label="Unavailable" size="small" color="default" variant="outlined" />;
+        return <Chip label="Disabled" size="small" color="default" variant="outlined" />;
       default:
-        return <Chip label={status} size="small" variant="outlined" />;
+        return <Chip label={liveStatus} size="small" variant="outlined" />;
     }
   };
 
@@ -306,7 +331,7 @@ const ManageRooms = () => {
               Manage Rooms
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Create rooms — they become instantly bookable by all registered users.
+              Create rooms — status updates automatically based on current bookings.
             </Typography>
           </Box>
 
@@ -319,7 +344,6 @@ const ManageRooms = () => {
               width: { xs: '100%', md: 'auto' },
             }}
           >
-            {/* Search bar */}
             <TextField
               size="small"
               placeholder="Search rooms by name..."
@@ -342,7 +366,7 @@ const ManageRooms = () => {
               }}
             />
 
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchRooms} disabled={loading}>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchData} disabled={loading}>
               Refresh
             </Button>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
@@ -377,7 +401,7 @@ const ManageRooms = () => {
                 <TableCell sx={{ color: 'white' }}>Floor</TableCell>
                 <TableCell sx={{ color: 'white' }}>Department</TableCell>
                 <TableCell sx={{ color: 'white' }}>Capacity</TableCell>
-                <TableCell sx={{ color: 'white' }}>Status</TableCell>
+                <TableCell sx={{ color: 'white' }}>Live Status</TableCell>
                 <TableCell sx={{ color: 'white' }} align="center">
                   Actions
                 </TableCell>
@@ -397,6 +421,8 @@ const ManageRooms = () => {
               ) : (
                 filteredRooms.map((room) => {
                   const isProcessing = processingId === room._id;
+                  const liveStatus = getRoomLiveStatus(room);
+
                   return (
                     <TableRow key={room._id || room.id} hover>
                       <TableCell>
@@ -408,7 +434,7 @@ const ManageRooms = () => {
                       <TableCell>{room.floorNumber || 'N/A'}</TableCell>
                       <TableCell>{room.department || 'N/A'}</TableCell>
                       <TableCell>{room.maxCapacity || 0}</TableCell>
-                      <TableCell>{getStatusChip(room.status)}</TableCell>
+                      <TableCell>{getStatusChip(liveStatus)}</TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                           {/* Edit */}

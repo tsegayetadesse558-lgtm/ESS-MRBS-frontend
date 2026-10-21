@@ -39,7 +39,6 @@ import axiosInstance from '../api/axios';
 import TicketDialog from '../components/TicketDialog';
 
 // ---------- Time helpers ----------
-
 const HOURS = [
   { value: '00', label: '12 AM' },
   { value: '01', label: '1 AM' },
@@ -137,9 +136,10 @@ const Rooms = () => {
         roomsData = roomsData.rooms || roomsData.docs || [];
       }
 
-      // Only show rooms that are enabled (status = "available").
+      // ✅ FIX: Only hide rooms if explicitly set to maintenance. 
+      // Rooms marked as "booked" by the backend will STILL show up.
       roomsData = roomsData.filter(
-        (r) => (r.status || 'available').toLowerCase() === 'available'
+        (r) => (r.status || 'available').toLowerCase() !== 'maintenance'
       );
 
       setRooms(roomsData);
@@ -197,7 +197,6 @@ const Rooms = () => {
   const handleSubmitBooking = async () => {
     setBookingError('');
 
-    // ✅ Validation: Meeting Title is now required
     if (!form.meetingTitle.trim()) {
       setBookingError('Please enter a meeting title.');
       return;
@@ -227,7 +226,7 @@ const Rooms = () => {
 
       const payload = {
         roomId: selectedRoom._id,
-        meetingTitle: form.meetingTitle.trim(), // ✅ No longer defaults to 'Untitled Meeting'
+        meetingTitle: form.meetingTitle.trim(),
         meetingDate: form.meetingDate,
         startTime,
         endTime,
@@ -466,7 +465,6 @@ const Rooms = () => {
               </Alert>
             )}
 
-            {/* ✅ Added required attribute */}
             <TextField
               fullWidth
               required

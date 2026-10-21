@@ -87,11 +87,8 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
-        <Navbar />
-        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <CircularProgress />
-        </Box>
+      <Box sx={{ display: 'flex', flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
       </Box>
     );
   }
@@ -128,157 +125,149 @@ const AdminDashboard = () => {
   ];
 
   return (
-    // ✅ The outer Box ensures the background fills the whole screen perfectly
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
-      <Navbar />
-      
-      {/* ✅ flexGrow: 1 pushes the footer down and stretches the content area */}
-      <Box sx={{ flexGrow: 1, py: { xs: 3, md: 4 } }}>
-        <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 } }}>
-          
-          <Box sx={{ mb: { xs: 3, md: 4 } }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ fontSize: { xs: '2rem', md: '2.125rem' } }}>
-              Admin Dashboard
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Welcome back, {user?.fullName || 'Admin'}! Here is an overview of the system.
-            </Typography>
-          </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 4 }}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Stat cards */}
-          <Grid container spacing={2} sx={{ mb: { xs: 4, md: 5 } }}>
-            {statCards.map((stat, index) => (
-              <Grid item xs={12} sm={6} md={3} key={index}>
-                <Paper
-                  elevation={1}
-                  sx={{
-                    p: { xs: 2, md: 3 },
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    borderRadius: 2,
-                    cursor: stat.action ? 'pointer' : 'default',
-                    transition: 'all 0.2s',
-                    '&:hover': { boxShadow: stat.action ? 4 : 1, transform: 'translateY(-2px)' },
-                  }}
-                  onClick={() => stat.action && navigate(stat.action)}
-                >
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '2rem', md: '2.125rem' } }}>
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {stat.title}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ color: stat.color }}>{stat.icon}</Box>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-
-          {/* Quick Actions */}
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Quick Actions
+    // ✅ flexGrow: 1 makes the background stretch to the bottom of the screen
+    <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, bgcolor: '#f8f9fa' }}>
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            Admin Dashboard
           </Typography>
-          <Grid container spacing={2} sx={{ mb: { xs: 4, md: 5 } }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                startIcon={<PersonAdd />}
-                onClick={() => navigate('/admin/users')}
-                sx={{ py: 1.5, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
+          <Typography variant="body1" color="text.secondary">
+            Welcome back, {user?.fullName || 'Admin'}! Here is an overview of the system.
+          </Typography>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Stat cards */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          {statCards.map((stat, index) => (
+            <Grid item xs={12} sm={6} md={3} key={index}>
+              <Paper
+                elevation={1}
+                sx={{
+                  p: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderRadius: 2,
+                  cursor: stat.action ? 'pointer' : 'default',
+                  '&:hover': { boxShadow: stat.action ? 4 : 1 },
+                }}
+                onClick={() => stat.action && navigate(stat.action)}
               >
-                Manage Users
-              </Button>
+                <Box>
+                  <Typography variant="h4" fontWeight="bold">
+                    {stat.value}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {stat.title}
+                  </Typography>
+                </Box>
+                <Box sx={{ color: stat.color }}>{stat.icon}</Box>
+              </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                startIcon={<Room />}
-                onClick={() => navigate('/admin/rooms')}
-                sx={{ py: 1.5, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
-              >
-                Manage Rooms
-              </Button>
+          ))}
+        </Grid>
+
+        {/* Quick Actions */}
+        <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+          Quick Actions
+        </Typography>
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              startIcon={<PersonAdd />}
+              onClick={() => navigate('/admin/users')}
+              sx={{ py: 1.5, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
+            >
+              Manage Users
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              startIcon={<Room />}
+              onClick={() => navigate('/admin/rooms')}
+              sx={{ py: 1.5, bgcolor: '#08437a', '&:hover': { bgcolor: '#0f72d6' } }}
+            >
+              Manage Rooms
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              startIcon={<BookOnline />}
+              onClick={() => navigate('/admin/bookings')}
+              sx={{ py: 1.5, bgcolor: '#094381', '&:hover': { bgcolor: '#0e76e6' } }}
+            >
+              Manage Bookings
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              startIcon={<Assessment />}
+              onClick={() => navigate('/admin/reports')}
+              sx={{ py: 1.5, bgcolor: '#094883', '&:hover': { bgcolor: '#1284e2' } }}
+            >
+              View Reports
+            </Button>
+          </Grid>
+        </Grid>
+
+        {/* Booking Statistics */}
+        <Paper elevation={1} sx={{ p: 3, borderRadius: 2 }}>
+          <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
+            Booking Statistics
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f0fdf4', borderRadius: 2 }}>
+                <Typography variant="h5" color="success.main" fontWeight="bold">
+                  {stats.confirmedBookings}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Confirmed
+                </Typography>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                startIcon={<BookOnline />}
-                onClick={() => navigate('/admin/bookings')}
-                sx={{ py: 1.5, bgcolor: '#094381', '&:hover': { bgcolor: '#0e76e6' } }}
-              >
-                Manage Bookings
-              </Button>
+            <Grid item xs={4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3f4f6', borderRadius: 2 }}>
+                <Typography variant="h5" color="text.secondary" fontWeight="bold">
+                  {stats.cancelledBookings}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Cancelled
+                </Typography>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                startIcon={<Assessment />}
-                onClick={() => navigate('/admin/reports')}
-                sx={{ py: 1.5, bgcolor: '#094883', '&:hover': { bgcolor: '#1284e2' } }}
-              >
-                View Reports
-              </Button>
+            <Grid item xs={4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#eff6ff', borderRadius: 2 }}>
+                <Typography variant="h5" color="info.main" fontWeight="bold">
+                  {stats.todayBookings}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Today
+                </Typography>
+              </Box>
             </Grid>
           </Grid>
-
-          {/* Booking Statistics */}
-          <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
-              Booking Statistics
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={4}>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f0fdf4', borderRadius: 1 }}>
-                  <Typography variant="h5" color="success.main" fontWeight="bold">
-                    {stats.confirmedBookings}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Confirmed
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={4}>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f3f4f6', borderRadius: 1 }}>
-                  <Typography variant="h5" color="text.secondary" fontWeight="bold">
-                    {stats.cancelledBookings}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Cancelled
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={4}>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#eff6ff', borderRadius: 1 }}>
-                  <Typography variant="h5" color="info.main" fontWeight="bold">
-                    {stats.todayBookings}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Today
-                  </Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-
-        </Container>
-      </Box>
+        </Paper>
+      </Container>
     </Box>
   );
 };

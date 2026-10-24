@@ -25,6 +25,7 @@ import {
 import {
   Refresh as RefreshIcon,
   Delete as DeleteIcon,
+  DeleteSweep as ClearAllIcon,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -55,6 +56,7 @@ const ManageBookings = () => {
     bookingId: null,
     bookingDetails: null,
   });
+  const [clearAllDialog, setClearAllDialog] = useState({ open: false }); // ✅ New State
   const [processingId, setProcessingId] = useState(null);
 
   useEffect(() => {
@@ -107,6 +109,46 @@ const ManageBookings = () => {
       });
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  // ✅ New: Admin Clear All History
+  const handleClearAll = async () => {
+    try {
+      const now = new Date();
+      
+      const bookingsToClear = bookings.filter((b) => {
+        const isCancelled = b.status?.toLowerCase() === 'cancelled';
+        
+        const meetingDateTime = new Date(b.meetingDate);
+        const [endHour, endMinute] = b.endTime.split(':').map(Number);
+        meetingDateTime.setHours(endHour, endMinute, 0, 0);
+        const isPast = meetingDateTime < now;
+
+        return isPast || isCancelled;
+      });
+
+      if (bookingsToClear.length === 0) {
+        setSnackbar({ open: true, message: 'No past or cancelled bookings to clear.', severity: 'info' });
+        setClearAllDialog({ open: false });
+        return;
+      }
+
+      await Promise.all(
+        bookingsToClear.map((b) => axiosInstance.delete(`/bookings/${b._id}`))
+      );
+
+      setSnackbar({ open: true, message: '🗑️ History cleared successfully', severity: 'success' });
+      await fetchBookings();
+    } catch (err) {
+      console.error('Error clearing history:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to clear some bookings. Please try again.',
+        severity: 'error',
+      });
+    } finally {
+      setClearAllDialog({ open: false });
     }
   };
 
@@ -171,7 +213,7 @@ const ManageBookings = () => {
     <>
       <Navbar />
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Typography variant="h4" fontWeight="bold">
               Manage Bookings
@@ -180,14 +222,26 @@ const ManageBookings = () => {
               All confirmed room bookings across the system.
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchBookings}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
+          
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={fetchBookings}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="error" 
+              startIcon={<ClearAllIcon />} 
+              onClick={() => setClearAllDialog({ open: true })}
+              disabled={bookings.length === 0}
+            >
+              Clear History
+            </Button>
+          </Box>
         </Box>
 
         {error && (
@@ -351,6 +405,31 @@ const ManageBookings = () => {
             <Button onClick={handleDeleteCancel}>Cancel</Button>
             <Button onClick={handleDeleteConfirm} color="error" variant="contained">
               Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ✅ Clear History Confirmation Dialog */}
+        <Dialog open={clearAllDialog.open} onClose={() => setClearAllDialog({ open: false })} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ClearAllIcon color="error" />
+            Clear Booking History
+          </DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to clear the system's booking history?
+              <br />
+              <Typography component="span" color="error" variant="body2">
+                This will permanently delete all past and cancelled bookings from the database. Upcoming confirmed bookings will not be affected.
+              </Typography>
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setClearAllDialog({ open: false })}>
+              Cancel
+            </Button>
+            <Button onClick={handleClearAll} color="error" variant="contained">
+              Yes, Clear History
             </Button>
           </DialogActions>
         </Dialog>

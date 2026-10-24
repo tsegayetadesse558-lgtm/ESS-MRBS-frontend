@@ -39,7 +39,7 @@ import axiosInstance from '../api/axios';
 
 const ManageRooms = () => {
   const [rooms, setRooms] = useState([]);
-  const [bookings, setBookings] = useState([]); // Added to track live status
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const [dialogError, setDialogError] = useState('');
@@ -63,12 +63,35 @@ const ManageRooms = () => {
     amenities: '',
   });
 
+  // ✅ Replaced with the official 27 ESS departments
   const departments = [
-    'Director Office',
-    'Deputy Director Office',
-    'Business Statistics',
-    'Household Statistics',
-    'Other Departments',
+    'Audit Executive Officer II',
+    'Legal Service Executive Officer',
+    'Ethics Executive Officer I',
+    'Public Relation and Communication Executive Officer I',
+    'Women and Social Affair inclusiveness Executive Officer I',
+    'Procurement and Finance Executive Officer II',
+    'Institutional Change Executive Officer II',
+    'Human Resource Management and Competence Executive Officer II',
+    'Strategic Affairs Executive Officer II',
+    'Information Communication Tecnology Chief Executive Officer',
+    'Chief Executive Office of Basic service',
+    'Vehicle de ployment and maintenance Executive Officer I',
+    'Population Statistics Chief Executive Officer',
+    'Social and Inclusiveness Statistics Chief Executive Officer',
+    'Vital Statistics Chief Executive Officer',
+    'Price Statistics Chief Executive Officer',
+    'Director of the Business Statistics Directorate',
+    'Chief Executive Officer Of Agricultural Statistics',
+    'Chief Executive Officer of Household Budget and Labour Statistics',
+    'Economic Statistics',
+    'Information Technology and Infrastructure Development Chief Executive Officer',
+    'Geospatial Statistics Chief Executive Officer',
+    'Statistical Data Dissemination and Access Chief Executive Officer',
+    'Statistical Surveys Methodology Chief Executive Officer',
+    'Statistics Research and training Chief Executive Officer',
+    'Administrative Data Harmonization, Standard and Quality Chief Executive Officer',
+    'Branch Offices and Operation Coordination Chief Executive Officer',
   ];
 
   useEffect(() => {
@@ -106,7 +129,6 @@ const ManageRooms = () => {
     );
   }, [rooms, searchQuery]);
 
-  // ✅ Helper to determine live room status
   const getRoomLiveStatus = (room) => {
     if (room.status === 'maintenance') return 'maintenance';
     if (room.status === 'unavailable') return 'unavailable';
@@ -115,17 +137,14 @@ const ManageRooms = () => {
     const todayStr = now.toISOString().split('T')[0];
 
     const currentBooking = bookings.find((b) => {
-      // Handle populated vs unpopulated room ID
       const bRoomId = b.room?._id || b.room;
       if (bRoomId !== room._id) return false;
       if (b.status !== 'confirmed') return false;
 
-      // Check if date matches today
       const bDate = new Date(b.meetingDate).toISOString().split('T')[0];
       if (bDate !== todayStr) return false;
 
-      // Check time overlap
-      const currentTimeStr = now.toTimeString().slice(0, 5); // "HH:MM"
+      const currentTimeStr = now.toTimeString().slice(0, 5);
       return currentTimeStr >= b.startTime && currentTimeStr <= b.endTime;
     });
 
@@ -240,7 +259,6 @@ const ManageRooms = () => {
     }
   };
 
-  // ---------- Delete room ----------
   const handleDeleteRoom = async () => {
     const { roomId } = deleteDialog;
     if (!roomId) return;

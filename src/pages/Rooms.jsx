@@ -22,6 +22,9 @@ import {
   Divider,
   FormControlLabel,
   Switch,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import {
   MeetingRoom,
@@ -32,6 +35,7 @@ import {
   AccessTime as TimeIcon,
   Business as BuildingIcon,
   LocalCafe as TeaIcon,
+  EventAvailable as EventIcon,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -40,30 +44,14 @@ import TicketDialog from '../components/TicketDialog';
 
 // ---------- Time helpers ----------
 const HOURS = [
-  { value: '00', label: '12 AM' },
-  { value: '01', label: '1 AM' },
-  { value: '02', label: '2 AM' },
-  { value: '03', label: '3 AM' },
-  { value: '04', label: '4 AM' },
-  { value: '05', label: '5 AM' },
-  { value: '06', label: '6 AM' },
-  { value: '07', label: '7 AM' },
-  { value: '08', label: '8 AM' },
-  { value: '09', label: '9 AM' },
-  { value: '10', label: '10 AM' },
-  { value: '11', label: '11 AM' },
-  { value: '12', label: '12 PM' },
-  { value: '13', label: '1 PM' },
-  { value: '14', label: '2 PM' },
-  { value: '15', label: '3 PM' },
-  { value: '16', label: '4 PM' },
-  { value: '17', label: '5 PM' },
-  { value: '18', label: '6 PM' },
-  { value: '19', label: '7 PM' },
-  { value: '20', label: '8 PM' },
-  { value: '21', label: '9 PM' },
-  { value: '22', label: '10 PM' },
-  { value: '23', label: '11 PM' },
+  { value: '00', label: '12 AM' }, { value: '01', label: '1 AM' }, { value: '02', label: '2 AM' },
+  { value: '03', label: '3 AM' }, { value: '04', label: '4 AM' }, { value: '05', label: '5 AM' },
+  { value: '06', label: '6 AM' }, { value: '07', label: '7 AM' }, { value: '08', label: '8 AM' },
+  { value: '09', label: '9 AM' }, { value: '10', label: '10 AM' }, { value: '11', label: '11 AM' },
+  { value: '12', label: '12 PM' }, { value: '13', label: '1 PM' }, { value: '14', label: '2 PM' },
+  { value: '15', label: '3 PM' }, { value: '16', label: '4 PM' }, { value: '17', label: '5 PM' },
+  { value: '18', label: '6 PM' }, { value: '19', label: '7 PM' }, { value: '20', label: '8 PM' },
+  { value: '21', label: '9 PM' }, { value: '22', label: '10 PM' }, { value: '23', label: '11 PM' },
 ];
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -96,6 +84,7 @@ const MENU_PROPS = {
 const Rooms = () => {
   const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
+  const [allBookings, setAllBookings] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
@@ -116,33 +105,41 @@ const Rooms = () => {
     teaService: false,
   });
 
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleRoom, setScheduleRoom] = useState(null);
+  const [roomBookings, setRoomBookings] = useState([]);
+
   const [ticketOpen, setTicketOpen] = useState(false);
   const [ticketData, setTicketData] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    fetchRooms();
+    fetchData();
   }, []);
 
-  const fetchRooms = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError('');
 
-      const response = await axiosInstance.get('/rooms');
-      let roomsData = response.data?.data || response.data || [];
+      // ✅ The backend now returns ALL bookings (both personal + everyone else's confirmed)
+      const [roomsRes, bookingsRes] = await Promise.all([
+        axiosInstance.get('/rooms'),
+        axiosInstance.get('/bookings') 
+      ]);
 
-      if (!Array.isArray(roomsData)) {
-        roomsData = roomsData.rooms || roomsData.docs || [];
-      }
+      let roomsData = roomsRes.data?.data || roomsRes.data || [];
+      let bookingsData = bookingsRes.data?.data || bookingsRes.data || [];
 
-      // ✅ FIX: Only hide rooms if explicitly set to maintenance. 
-      // Rooms marked as "booked" by the backend will STILL show up.
+      if (!Array.isArray(roomsData)) roomsData = roomsData.rooms || roomsData.docs || [];
+      if (!Array.isArray(bookingsData)) bookingsData = bookingsData.bookings || bookingsData.docs || [];
+
       roomsData = roomsData.filter(
         (r) => (r.status || 'available').toLowerCase() !== 'maintenance'
       );
 
       setRooms(roomsData);
+      setAllBookings(bookingsData);
 
       const depts = [...new Set(roomsData.map((r) => r.department).filter(Boolean))];
       setDepartments(depts);
@@ -151,10 +148,34 @@ const Rooms = () => {
         setError('No rooms are currently available. Please check back later.');
       }
     } catch (err) {
-      console.error('Error fetching rooms:', err);
-      setError('Failed to load rooms. Please try again.');
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewSchedule = (room) => {
+    // ✅ Filters the global bookings to find any confirmed booking for this room
+    const thisRoomBookings = allBookings.filter((b) => {
+      const bRoomId = b.room?._id || b.room;
+      return bRoomId === room._id && b.status === 'confirmed';
+    });
+
+    thisRoomBookings.sort((a, b) => {
+      const dateCompare = new Date(a.meetingDate) - new Date(b.meetingDate);
+      if (dateCompare !== 0) return dateCompare;
+      return a.startTime.localeCompare(b.startTime);
+    });
+
+    if (thisRoomBookings.length === 0) {
+      // If there are truly no bookings, skip to form
+      handleOpenBooking(room);
+    } else {
+      // If there are bookings (by anyone), show the schedule popup
+      setScheduleRoom(room);
+      setRoomBookings(thisRoomBookings);
+      setScheduleOpen(true);
     }
   };
 
@@ -244,7 +265,7 @@ const Rooms = () => {
         severity: 'success',
       });
       handleCloseBooking();
-      fetchRooms();
+      fetchData(); 
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -423,7 +444,7 @@ const Rooms = () => {
                       fullWidth
                       variant="contained"
                       startIcon={<BookOnline />}
-                      onClick={() => handleOpenBooking(room)}
+                      onClick={() => handleViewSchedule(room)}
                       sx={{
                         borderRadius: 2,
                         py: 1.5,
@@ -439,6 +460,69 @@ const Rooms = () => {
             ))}
           </Grid>
         )}
+
+        {/* View Schedule Dialog */}
+        <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ bgcolor: '#063b70', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                Availability: {scheduleRoom?.roomName}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                {scheduleRoom?.department}
+              </Typography>
+            </Box>
+            <IconButton onClick={() => setScheduleOpen(false)} sx={{ color: 'white' }}>
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ mt: 2 }}>
+            <Box>
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                This room has upcoming bookings. Please select different time.
+              </Alert>
+              <List disablePadding>
+                {roomBookings.map((booking, index) => (
+                  <ListItem 
+                    key={booking._id} 
+                    divider={index !== roomBookings.length - 1}
+                    sx={{ px: 1, py: 2, borderLeft: '4px solid #c62828', bgcolor: '#fafafa', mb: 1, borderRadius: 1 }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="subtitle2" fontWeight="bold" color="#0a1628">
+                            {new Date(booking.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Typography>
+                          <Chip label="Booked" size="small" variant="outlined" sx={{ maxWidth: 150 }} />
+                        </Box>
+                      }
+                      secondary={
+                        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                          <TimeIcon fontSize="small" />
+                          Booked from <strong>{formatTime12h(booking.startTime)}</strong> to <strong>{formatTime12h(booking.endTime)}</strong>
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
+            <Button onClick={() => setScheduleOpen(false)}>Close</Button>
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                setScheduleOpen(false);
+                handleOpenBooking(scheduleRoom);
+              }}
+              sx={{ bgcolor: '#063b70' }}
+            >
+              Proceed to Booking
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Booking dialog */}
         <Dialog open={bookingOpen} onClose={handleCloseBooking} maxWidth="sm" fullWidth>

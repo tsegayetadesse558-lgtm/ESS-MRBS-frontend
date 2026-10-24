@@ -28,6 +28,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Delete as DeleteIcon,
+  DeleteSweep as ClearAllIcon,
 } from '@mui/icons-material';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -50,6 +51,7 @@ const BookingHistory = () => {
   const [error, setError] = useState('');
   const [cancelDialog, setCancelDialog] = useState({ open: false, bookingId: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, bookingId: null });
+  const [clearAllDialog, setClearAllDialog] = useState({ open: false });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
@@ -85,11 +87,7 @@ const BookingHistory = () => {
     try {
       const response = await axiosInstance.put(`/bookings/${bookingId}/cancel`);
       if (response.data && response.data.success) {
-        setSnackbar({
-          open: true,
-          message: '✅ Booking cancelled successfully',
-          severity: 'success',
-        });
+        setSnackbar({ open: true, message: '✅ Booking cancelled successfully', severity: 'success' });
         await fetchBookings();
       } else {
         throw new Error(response.data?.message || 'Failed to cancel booking');
@@ -113,11 +111,7 @@ const BookingHistory = () => {
     try {
       const response = await axiosInstance.delete(`/bookings/${bookingId}`);
       if (response.data && response.data.success) {
-        setSnackbar({
-          open: true,
-          message: '🗑️ Booking deleted successfully',
-          severity: 'success',
-        });
+        setSnackbar({ open: true, message: '🗑️ Booking deleted successfully', severity: 'success' });
         await fetchBookings();
       } else {
         throw new Error(response.data?.message || 'Failed to delete booking');
@@ -134,49 +128,87 @@ const BookingHistory = () => {
     }
   };
 
+  const handleClearAll = async () => {
+    try {
+      const bookingsToClear = bookings.filter((b) => {
+        const isPast = !isUpcoming(b);
+        const isCancelled = b.status?.toLowerCase() === 'cancelled';
+        return isPast || isCancelled;
+      });
+
+      if (bookingsToClear.length === 0) {
+        setSnackbar({ open: true, message: 'No past or cancelled bookings to clear.', severity: 'info' });
+        setClearAllDialog({ open: false });
+        return;
+      }
+
+      await Promise.all(
+        bookingsToClear.map((b) => axiosInstance.delete(`/bookings/${b._id}`))
+      );
+
+      setSnackbar({ open: true, message: '🗑️ History cleared successfully', severity: 'success' });
+      await fetchBookings();
+    } catch (err) {
+      console.error('Error clearing history:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to clear some bookings. Please try again.',
+        severity: 'error',
+      });
+    } finally {
+      setClearAllDialog({ open: false });
+    }
+  };
+
   const openCancelDialog = (bookingId) => setCancelDialog({ open: true, bookingId });
   const openDeleteDialog = (bookingId) => setDeleteDialog({ open: true, bookingId });
 
-  // Is the meeting in the future (or today)?
+  // ✅ FIXED: Accurate time checking for "is upcoming"
   const isUpcoming = (booking) => {
     if (!booking?.meetingDate) return false;
-    const bookingDate = new Date(booking.meetingDate);
-    bookingDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return bookingDate >= today;
+    
+    // Combine date and time into a single Date object
+    const datePart = new Date(booking.meetingDate).toISOString().split('T')[0];
+    const meetingDateTime = new Date(`${datePart}T${booking.startTime}:00`);
+    
+    // Get current time
+    const now = new Date();
+    
+    // Returns true if the meeting is happening right now or in the future
+    return meetingDateTime >= now;
   };
 
-  // Cancel is allowed only for CONFIRMED + upcoming
+  // ✅ FIXED: Cancel is allowed for confirmed meetings that haven't started yet
   const isCancelDisabled = (booking) => {
     if (!booking) return true;
     const status = booking.status?.toLowerCase();
     if (status !== 'confirmed') return true;
-    if (!isUpcoming(booking)) return true;
+    if (!isUpcoming(booking)) return true; // Blocks cancel if meeting has already started
     return false;
   };
 
-  // Delete is allowed for any booking that isn't already cancelled (admin-level cleanup)
+  // Delete is allowed for anything that isn't a future confirmed meeting
   const isDeleteDisabled = (booking) => {
     if (!booking) return true;
     const status = booking.status?.toLowerCase();
-    return status === 'cancelled' || status === 'canceled';
+    if (status === 'confirmed' && isUpcoming(booking)) return true;
+    return false;
   };
 
   const getCancelTooltip = (booking) => {
     if (!booking) return 'Booking not found';
     const status = booking.status?.toLowerCase();
-    if (status === 'cancelled' || status === 'canceled') return 'This booking has already been cancelled';
-    if (status === 'rejected') return 'This booking was rejected';
+    if (status === 'cancelled') return 'This booking has already been cancelled';
     if (status !== 'confirmed') return 'Only confirmed bookings can be cancelled';
-    if (!isUpcoming(booking)) return 'Cannot cancel past bookings';
+    if (!isUpcoming(booking)) return 'Cannot cancel past meetings';
     return 'Cancel this booking';
   };
 
   const getDeleteTooltip = (booking) => {
     if (!booking) return 'Booking not found';
-    const status = booking.status?.toLowerCase();
-    if (status === 'cancelled' || status === 'canceled') return 'This booking is already cancelled';
+    if (isDeleteDisabled(booking)) {
+      return 'Cancel the booking first before deleting it';
+    }
     return 'Delete this booking';
   };
 
@@ -185,8 +217,7 @@ const BookingHistory = () => {
     switch (status.toLowerCase()) {
       case 'confirmed': return 'success';
       case 'rejected': return 'error';
-      case 'cancelled':
-      case 'canceled': return 'default';
+      case 'cancelled': return 'default';
       default: return 'default';
     }
   };
@@ -196,8 +227,7 @@ const BookingHistory = () => {
     switch (status.toLowerCase()) {
       case 'confirmed': return <CheckCircleIcon fontSize="small" />;
       case 'rejected': return <ErrorIcon fontSize="small" />;
-      case 'cancelled':
-      case 'canceled': return <CancelIcon fontSize="small" />;
+      case 'cancelled': return <CancelIcon fontSize="small" />;
       default: return null;
     }
   };
@@ -217,13 +247,25 @@ const BookingHistory = () => {
     <>
       <Navbar />
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
           <Typography variant="h4" fontWeight="bold">
             My Bookings
           </Typography>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchBookings}>
-            Refresh
-          </Button>
+          
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchBookings}>
+              Refresh
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="error" 
+              startIcon={<ClearAllIcon />} 
+              onClick={() => setClearAllDialog({ open: true })}
+              disabled={bookings.length === 0}
+            >
+              Clear History
+            </Button>
+          </Box>
         </Box>
 
         {error && (
@@ -300,7 +342,6 @@ const BookingHistory = () => {
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          {/* Cancel */}
                           <Tooltip title={getCancelTooltip(booking)}>
                             <span>
                               <Button
@@ -322,7 +363,6 @@ const BookingHistory = () => {
                             </span>
                           </Tooltip>
 
-                          {/* Delete */}
                           <Tooltip title={getDeleteTooltip(booking)}>
                             <span>
                               <IconButton
@@ -330,7 +370,7 @@ const BookingHistory = () => {
                                 color="error"
                                 onClick={() => openDeleteDialog(booking._id)}
                                 disabled={deleteDisabled}
-                                sx={{ opacity: deleteDisabled ? 0.5 : 1 }}
+                                sx={{ opacity: deleteDisabled ? 0.3 : 1 }}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
@@ -346,13 +386,8 @@ const BookingHistory = () => {
           </TableContainer>
         )}
 
-        {/* Cancel Confirmation Dialog */}
-        <Dialog
-          open={cancelDialog.open}
-          onClose={() => setCancelDialog({ open: false, bookingId: null })}
-          maxWidth="sm"
-          fullWidth
-        >
+        {/* Dialogs and Snackbar remain the same */}
+        <Dialog open={cancelDialog.open} onClose={() => setCancelDialog({ open: false, bookingId: null })} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CancelIcon color="error" />
             Cancel Booking
@@ -376,13 +411,7 @@ const BookingHistory = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={deleteDialog.open}
-          onClose={() => setDeleteDialog({ open: false, bookingId: null })}
-          maxWidth="sm"
-          fullWidth
-        >
+        <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, bookingId: null })} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <DeleteIcon color="error" />
             Delete Booking
@@ -392,7 +421,7 @@ const BookingHistory = () => {
               Are you sure you want to delete this booking?
               <br />
               <Typography component="span" color="error" variant="body2">
-                This action cannot be undone.
+                This will permanently remove it from your history.
               </Typography>
             </Typography>
           </DialogContent>
@@ -402,6 +431,30 @@ const BookingHistory = () => {
             </Button>
             <Button onClick={handleDeleteBooking} color="error" variant="contained">
               Yes, Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={clearAllDialog.open} onClose={() => setClearAllDialog({ open: false })} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ClearAllIcon color="error" />
+            Clear Booking History
+          </DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to clear your history?
+              <br />
+              <Typography component="span" color="error" variant="body2">
+                This will permanently delete all past and cancelled bookings. Upcoming confirmed bookings will not be affected.
+              </Typography>
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setClearAllDialog({ open: false })}>
+              Cancel
+            </Button>
+            <Button onClick={handleClearAll} color="error" variant="contained">
+              Yes, Clear History
             </Button>
           </DialogActions>
         </Dialog>

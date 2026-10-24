@@ -112,9 +112,10 @@ const TicketDialog = ({ open, onClose, booking }) => {
           <title>Ticket ${ticketNumber}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
-            .ticket-container { border: 2px solid #1976d2; border-radius: 12px; padding: 30px; background: white; }
+            /* ✅ Org Color: Navy Blue */
+            .ticket-container { border: 2px solid #0c2b69; border-radius: 12px; padding: 30px; background: white; }
             .header { text-align: center; margin-bottom: 20px; }
-            .header h2 { color: #1976d2; margin: 0; }
+            .header h2 { color: #0c2b69; margin: 0; }
             .header p { color: #666; margin: 0; }
             .divider { border-top: 1px solid #ddd; margin: 15px 0; }
             .detail-row { display: flex; margin: 8px 0; }
@@ -134,7 +135,7 @@ const TicketDialog = ({ open, onClose, booking }) => {
             </div>
 
             <div style="text-align:center;margin-bottom:15px;">
-              <span style="background:#1976d2;color:white;padding:4px 12px;border-radius:16px;font-size:12px;">
+              <span style="background:#0c2b69;color:white;padding:4px 12px;border-radius:16px;font-size:12px;">
                 Ticket #${ticketNumber}
               </span>
             </div>
@@ -163,7 +164,7 @@ const TicketDialog = ({ open, onClose, booking }) => {
             </div>
           </div>
           <div class="no-print" style="text-align:center;margin-top:20px;">
-            <button onclick="window.print()" style="padding:10px 30px;background:#1976d2;color:white;border:none;border-radius:4px;cursor:pointer;">🖨️ Print Ticket</button>
+            <button onclick="window.print()" style="padding:10px 30px;background:#0c2b69;color:white;border:none;border-radius:4px;cursor:pointer;">🖨️ Print Ticket</button>
             <button onclick="window.close()" style="padding:10px 30px;margin-left:10px;background:#666;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
           </div>
         </body>
@@ -191,7 +192,8 @@ const TicketDialog = ({ open, onClose, booking }) => {
         mx: 'auto',
         background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
         borderRadius: 3,
-        border: '2px solid #1976d2',
+        // ✅ Org Color: Navy Blue Border
+        border: '2px solid #0c2b69', 
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -203,12 +205,13 @@ const TicketDialog = ({ open, onClose, booking }) => {
           left: 0,
           right: 0,
           height: 6,
-          background: 'linear-gradient(90deg, #1976d2, #42a5f5, #1976d2)',
+          // ✅ Org Color: Navy to Light Blue Gradient
+          background: 'linear-gradient(90deg, #0c2b69, #42a5f5, #0c2b69)',
         }}
       />
 
       <Box sx={{ textAlign: 'center', mb: 3, mt: 1 }}>
-        <Typography variant="h6" fontWeight="bold" color="primary">
+        <Typography variant="h6" fontWeight="bold" sx={{ color: '#0c2b69' }}>
           ESS MRBS
         </Typography>
         <Typography variant="caption" color="text.secondary">
@@ -224,9 +227,8 @@ const TicketDialog = ({ open, onClose, booking }) => {
         <Chip
           icon={<QrCodeIcon />}
           label={`Ticket #${ticketNumber}`}
-          color="primary"
           variant="outlined"
-          sx={{ fontSize: '0.7rem' }}
+          sx={{ fontSize: '0.7rem', color: '#0c2b69', borderColor: '#0c2b69' }}
         />
       </Box>
 
@@ -236,35 +238,35 @@ const TicketDialog = ({ open, onClose, booking }) => {
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <MeetingRoomIcon fontSize="small" color="primary" />
+          <MeetingRoomIcon fontSize="small" sx={{ color: '#0c2b69' }} />
           <Typography variant="body2">
             <strong>Room:</strong> {roomName}
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <BusinessIcon fontSize="small" color="primary" />
+          <BusinessIcon fontSize="small" sx={{ color: '#0c2b69' }} />
           <Typography variant="body2">
             <strong>Department:</strong> {department}
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <LocationOnIcon fontSize="small" color="primary" />
+          <LocationOnIcon fontSize="small" sx={{ color: '#0c2b69' }} />
           <Typography variant="body2">
             <strong>Location:</strong> Building {buildingNumber}, Floor {floorNumber}
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <CalendarIcon fontSize="small" color="primary" />
+          <CalendarIcon fontSize="small" sx={{ color: '#0c2b69' }} />
           <Typography variant="body2">
             <strong>Date:</strong> {meetingDate}
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <TimeIcon fontSize="small" color="primary" />
+          <TimeIcon fontSize="small" sx={{ color: '#0c2b69' }} />
           <Typography variant="body2">
             <strong>Time:</strong> {startTime} - {endTime}
           </Typography>
@@ -272,7 +274,7 @@ const TicketDialog = ({ open, onClose, booking }) => {
 
         {teaService && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <TeaIcon fontSize="small" color="primary" />
+            <TeaIcon fontSize="small" sx={{ color: '#0c2b69' }} />
             <Typography variant="body2">
               <strong>Tea Service:</strong> Yes
             </Typography>
@@ -281,7 +283,7 @@ const TicketDialog = ({ open, onClose, booking }) => {
 
         {meetingTitle && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-            <MeetingRoomIcon fontSize="small" color="primary" />
+            <MeetingRoomIcon fontSize="small" sx={{ color: '#0c2b69' }} />
             <Typography variant="body2" fontStyle="italic">
               <strong>Meeting Title:</strong> "{meetingTitle}"
             </Typography>
@@ -291,7 +293,7 @@ const TicketDialog = ({ open, onClose, booking }) => {
 
       <Box sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PersonIcon fontSize="small" color="primary" />
+          <PersonIcon fontSize="small" sx={{ color: '#0c2b69' }} />
           <Typography variant="body2" color="text.secondary">
             <strong>Booked By:</strong> {bookedBy}
           </Typography>
@@ -325,7 +327,8 @@ const TicketDialog = ({ open, onClose, booking }) => {
           left: 0,
           right: 0,
           height: 4,
-          background: 'linear-gradient(90deg, #1976d2, #42a5f5, #1976d2)',
+          // ✅ Org Color: Navy to Light Blue Gradient
+          background: 'linear-gradient(90deg, #0c2b69, #42a5f5, #0c2b69)',
         }}
       />
     </Paper>
@@ -341,7 +344,8 @@ const TicketDialog = ({ open, onClose, booking }) => {
     >
       <DialogTitle
         sx={{
-          bgcolor: 'primary.main',
+          // ✅ Org Color: Navy Blue Header
+          bgcolor: '#0c2b69', 
           color: 'white',
           display: 'flex',
           justifyContent: 'space-between',
@@ -376,11 +380,11 @@ const TicketDialog = ({ open, onClose, booking }) => {
           variant="contained"
           startIcon={<PrintIcon />}
           onClick={handlePrintClick}
-          sx={{ borderRadius: 2, px: 4 }}
+          sx={{ borderRadius: 2, px: 4, bgcolor: '#0c2b69', '&:hover': { bgcolor: '#1a4b8c' } }}
         >
           Print Ticket
         </Button>
-        <Button variant="outlined" onClick={onClose} sx={{ borderRadius: 2 }}>
+        <Button variant="outlined" onClick={onClose} sx={{ borderRadius: 2, color: '#0c2b69', borderColor: '#0c2b69' }}>
           Close
         </Button>
       </DialogActions>

@@ -41,7 +41,7 @@ const features = [
   {
     icon: <SecurityIcon sx={{ fontSize: 32, color: '#1565c0' }} />,
     title: 'Secure Authentication',
-    desc: 'Role-based access control ensures that administrators and employees have the appropriate permissions, protecting sensitive data using JWT.',
+    desc: 'Role-based access control ensures that administrators and employees have the appropriate permissions, protecting sensitive data.',
   },
   {
     icon: <BarChartIcon sx={{ fontSize: 32, color: '#1565c0' }} />,
@@ -147,7 +147,7 @@ const Home = () => {
                 A Smarter Way to Manage Meeting Spaces
               </Typography>
               <Typography variant="h6" sx={{ color: '#546e7a', fontWeight: 400, fontSize: { xs: '1rem', md: '1.2rem' } }}>
-                Automating room reservation management, eliminating scheduling conflicts, and providing real-time visibility.
+                Automating room reservation management, eliminating booking conflicts, and providing real-time visibility.
               </Typography>
             </Box>
 
@@ -284,15 +284,6 @@ const Home = () => {
 
               <Grid item md={0.5} sx={{ display: { xs: 'none', md: 'block' } }}>
                 <Divider orientation="vertical" sx={{ height: 30 }} />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#e3f2fd', borderRadius: '50%' }}>
-                    <AccessTimeIcon sx={{ color: '#1565c0' }} />
-                  </Box>
-                  <Typography variant="subtitle1" fontWeight="600" color="#1a237e">Real-Time Visibility</Typography>
-                </Box>
               </Grid>
             </Grid>
           </Container>
